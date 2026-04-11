@@ -3953,6 +3953,7 @@ void P_SetupLevel(int episode, int map, int playermask, int skill)
   if (!samelevel)
   {
     P_SyncWalkcam(true, true);
+    dsda_ApplyViewcam();
   }
 
   R_SmoothPlaying_Reset(NULL);

@@ -4116,6 +4116,12 @@ void P_WalkTicker()
   int side;
   int angturn;
 
+  if (dsda_viewcam_enabled)
+  {
+    dsda_ApplyViewcam();
+    return;
+  }
+
   if (!walkcamera.type || menuactive)
     return;
 

@@ -1,0 +1,1 @@
+This is DSDA-Doom, a modern source port for the classic first-person shooter game Doom. It is a successor of PRBoom+ with extra tooling for demo recording and playback, fully compatible with the original Doom, with a focus on speedrunning and quality of life.

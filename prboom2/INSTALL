@@ -34,8 +34,8 @@ As well as the following:
 `mkdir build && cd build`
 
 4. Run `CMake` to configure the build:
-   - For a release build: `cmake .. -DCMAKE_BUILD_TYPE=Release`
-   - For a debug build: `cmake .. -DCMAKE_BUILD_TYPE=Debug`
+   - For a release build: `cmake ../prboom2 -DCMAKE_BUILD_TYPE=Release`
+   - For a debug build: `cmake ../prboom2 -DCMAKE_BUILD_TYPE=Debug`
    (Debug builds provide more details in the event of issues but have slightly lower performance.)
 
 This should end with the message "Build files have been written to: [folderpath]".
