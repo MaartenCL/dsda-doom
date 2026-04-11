@@ -15,6 +15,8 @@
 //	DSDA Playback
 //
 
+#include <stdio.h>
+
 #include "doomstat.h"
 #include "g_game.h"
 #include "i_system.h"
@@ -41,13 +43,68 @@ static dsda_arg_t* playlump_arg;
 static dsda_arg_t* fastdemo_arg;
 static dsda_arg_t* timedemo_arg;
 static dsda_arg_t* recordfromto_arg;
+static dsda_arg_t* takesec_arg;
+static dsda_arg_t* taketic_arg;
 static char* playback_name;
 static char* playback_filename;
+static int playback_take_tics;
+static int playback_take_window_start;
+static dboolean playback_take_window_started;
 
 extern int demo_tics;
 
 dboolean demoplayback;
 dboolean userdemo;
+
+static dboolean dsda_PlaybackSupportsTake(void) {
+  return playdemo_arg || timedemo_arg || fastdemo_arg;
+}
+
+static int dsda_ParseTakeTics(const char* value) {
+  float seconds;
+
+  if (sscanf(value, "%f", &seconds) != 1)
+    I_Error("-takesec requires a float argument");
+
+  if (seconds <= 0)
+    I_Error("-takesec argument must be greater than 0");
+
+  return (int) (seconds * TICRATE);
+}
+
+static void dsda_ResetTake(void) {
+  playback_take_tics = 0;
+  playback_take_window_start = 0;
+  playback_take_window_started = false;
+}
+
+static void dsda_ConfigureTake(void) {
+  takesec_arg = dsda_Arg(dsda_arg_takesec);
+  taketic_arg = dsda_Arg(dsda_arg_taketic);
+  dsda_ResetTake();
+
+  if (!takesec_arg->found && !taketic_arg->found)
+    return;
+
+  if (!dsda_PlaybackSupportsTake()) {
+    if (taketic_arg->found)
+      lprintf(LO_WARN, "Warning: ignoring -taketic without -playdemo, -timedemo, or -fastdemo\n");
+
+    if (takesec_arg->found)
+      lprintf(LO_WARN, "Warning: ignoring -takesec without -playdemo, -timedemo, or -fastdemo\n");
+
+    return;
+  }
+
+  if (takesec_arg->found)
+    playback_take_tics = dsda_ParseTakeTics(takesec_arg->value.v_string);
+
+  if (taketic_arg->found)
+    playback_take_tics = taketic_arg->value.v_int;
+
+  playback_take_window_start = dsda_SkipTargetTics();
+  playback_take_window_started = !dsda_SkipMode();
+}
 
 void dsda_RestartPlayback(void) {
   G_StartDemoPlayback(playback_origin_p, playback_length, playback_behaviour);
@@ -84,6 +141,8 @@ const char* dsda_PlaybackName(void) {
 }
 
 void dsda_ExecutePlaybackOptions(void) {
+  dsda_ConfigureTake();
+
   if (playlump_arg) {
     if (W_CheckNumForName(playback_name) == LUMP_NOT_FOUND)
       I_Error("Unable to find required internal demo lump \"%s\"", playback_name);
@@ -130,6 +189,9 @@ static void dsda_UpdatePlaybackName(const char* name, dboolean require_file) {
 
 const char* dsda_ParsePlaybackOptions(void) {
   dsda_arg_t* arg;
+
+  takesec_arg = dsda_Arg(dsda_arg_takesec);
+  taketic_arg = dsda_Arg(dsda_arg_taketic);
 
   arg = dsda_Arg(dsda_arg_playdemo);
   if (arg->found) {
@@ -194,6 +256,9 @@ void dsda_AttachPlaybackStream(const byte* demo_p, int length, int behaviour) {
   playback_length = length;
   playback_behaviour = behaviour;
   demo_tics = 0;
+
+  if (playback_take_tics > 0 && !playback_take_window_started)
+    playback_take_window_start = dsda_SkipTargetTics();
 }
 
 void dsda_StorePlaybackPosition(void) {
@@ -212,9 +277,18 @@ void dsda_ClearPlaybackStream(void) {
   playback_length = 0;
   playback_behaviour = 0;
   demo_tics = 0;
+  dsda_ResetTake();
 
   demoplayback = false;
   userdemo = false;
+}
+
+void dsda_NotifyPlaybackWindowStart(void) {
+  if (playback_take_tics <= 0 || playback_take_window_started)
+    return;
+
+  playback_take_window_start = dsda_DemoTic();
+  playback_take_window_started = true;
 }
 
 static dboolean dsda_EndOfPlaybackStream(void) {
@@ -248,7 +322,10 @@ void dsda_TryPlaybackOneTick(ticcmd_t* cmd) {
   if (!playback_p)
     return;
 
-  if (dsda_EndOfPlaybackStream())
+  if (playback_take_tics > 0 && playback_take_window_started &&
+      dsda_DemoTic() - playback_take_window_start >= playback_take_tics)
+    ended = true;
+  else if (dsda_EndOfPlaybackStream())
     ended = true;
   else {
     G_ReadOneTick(cmd, &playback_p);

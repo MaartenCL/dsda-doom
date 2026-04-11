@@ -63,6 +63,8 @@ typedef enum {
   dsda_arg_viewcam,
   dsda_arg_skipsec,
   dsda_arg_skiptic,
+  dsda_arg_takesec,
+  dsda_arg_taketic,
   dsda_arg_track_pacifist,
   dsda_arg_track_100k,
   dsda_arg_track_reality,

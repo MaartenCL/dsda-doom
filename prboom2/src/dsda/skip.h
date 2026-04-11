@@ -32,3 +32,4 @@ void dsda_EvaluateSkipModeDoTeleportNewMap(void);
 void dsda_EvaluateSkipModeDoWorldDone(void);
 void dsda_EvaluateSkipModeCheckDemoStatus(void);
 void dsda_HandleSkip(void);
+int dsda_SkipTargetTics(void);

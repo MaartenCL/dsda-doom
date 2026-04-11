@@ -33,3 +33,4 @@ void dsda_StorePlaybackPosition(void);
 void dsda_RestorePlaybackPosition(void);
 void dsda_JoinDemo(ticcmd_t* cmd);
 void dsda_TryPlaybackOneTick(ticcmd_t* cmd);
+void dsda_NotifyPlaybackWindowStart(void);

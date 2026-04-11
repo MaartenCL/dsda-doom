@@ -263,6 +263,16 @@ static arg_config_t arg_config[dsda_arg_count] = {
     "skip to the given tic - negative tics seek from the end",
     arg_int, INT_MIN, INT_MAX,
   },
+  [dsda_arg_takesec] = {
+    "-takesec", NULL, NULL,
+    "play only the given number of seconds after demo playback starts",
+    arg_string,
+  },
+  [dsda_arg_taketic] = {
+    "-taketic", NULL, NULL,
+    "play only the given number of tics after demo playback starts",
+    arg_int, 1, INT_MAX,
+  },
   [dsda_arg_track_pacifist] = {
     "-track_pacifist", NULL, NULL,
     "tracks pacifist category restrictions",

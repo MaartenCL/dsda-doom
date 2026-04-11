@@ -92,6 +92,8 @@ void dsda_EnterSkipMode(void) {
 void dsda_ExitSkipMode(void) {
   skip_mode = false;
 
+  dsda_NotifyPlaybackWindowStart();
+
   dsda_ResetSkipSettings();
 
   skip_until_next_map = false;
@@ -232,4 +234,8 @@ void dsda_HandleSkip(void) {
 
     dsda_EnterSkipMode();
   }
+}
+
+int dsda_SkipTargetTics(void) {
+  return demo_skiptics;
 }
