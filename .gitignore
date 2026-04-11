@@ -28,3 +28,6 @@ CMakeUserPresets.json
 
 # clangd
 /.cache/
+
+# local deployment
+deploy.sh
