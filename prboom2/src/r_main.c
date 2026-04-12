@@ -659,7 +659,7 @@ void R_ExecuteSetViewSize (void)
 
   SetRatio(SCREENWIDTH, SCREENHEIGHT);
 
-  if (setblocks == 11)
+  if (setblocks == 11 || (demoplayback && walkcamera.type == 2))
   {
     viewheight = SCREENHEIGHT;
     freelookviewheight = viewheight;
@@ -935,7 +935,11 @@ static void R_SetupFrame (player_t *player)
 
   viewplayer = player;
 
-  extralight = player->extralight;
+  // Detached demo walkcam should not inherit the player's muzzle flash lighting.
+  if (demoplayback && walkcamera.type == 2)
+    extralight = 0;
+  else
+    extralight = player->extralight;
 
   if (extra_brightness < 0 || extra_brightness > 4) {
     extra_brightness = 0;

@@ -375,8 +375,17 @@ void D_Display (fixed_t frac)
   static dboolean isborderstate        = false;
   static dboolean borderwillneedredraw = false;
   static gamestate_t oldgamestate = GS_DEFAULT;
+  static dboolean detached_walkcam_last = false;
   dboolean wipe;
+  dboolean detached_walkcam_now;
   dboolean viewactive = false, isborder = false;
+
+  detached_walkcam_now = demoplayback && walkcamera.type == 2;
+  if (detached_walkcam_now != detached_walkcam_last)
+  {
+    R_SetViewSize();
+    detached_walkcam_last = detached_walkcam_now;
+  }
 
   // e6y
   if (dsda_SkipMode())
@@ -448,7 +457,8 @@ void D_Display (fixed_t frac)
 
     if (oldgamestate != GS_LEVEL || must_fill_back_screen) {
       must_fill_back_screen = false;
-      R_FillBackScreen ();    // draw the pattern into the back screen
+      if (!detached_walkcam_now)
+        R_FillBackScreen ();    // draw the pattern into the back screen
       redrawborderstuff = isborder;
     } else {
       // CPhipps -
@@ -464,7 +474,7 @@ void D_Display (fixed_t frac)
       borderwillneedredraw = borderwillneedredraw || automap_on;
     }
 
-    if (redrawborderstuff || V_IsOpenGLMode()) {
+    if ((redrawborderstuff || V_IsOpenGLMode()) && !detached_walkcam_now) {
       // elim - Update viewport and scene offsets whenever the view is changed (user hits "-" or "+")
       if (redrawborderstuff && V_IsOpenGLMode()) {
         dsda_GLSetRenderViewportParams();
@@ -505,17 +515,20 @@ void D_Display (fixed_t frac)
 
     R_RestoreInterpolations();
 
-    DSDA_ADD_CONTEXT(sf_status_bar);
-    ST_Drawer(redrawborderstuff || BorderNeedRefresh);
-    DSDA_REMOVE_CONTEXT(sf_status_bar);
+    if (!(demoplayback && walkcamera.type == 2))
+    {
+      DSDA_ADD_CONTEXT(sf_status_bar);
+      ST_Drawer(redrawborderstuff || BorderNeedRefresh);
+      DSDA_REMOVE_CONTEXT(sf_status_bar);
 
-    BorderNeedRefresh = false;
-    if (V_IsSoftwareMode())
-      R_DrawViewBorder();
+      BorderNeedRefresh = false;
+      if (V_IsSoftwareMode())
+        R_DrawViewBorder();
 
-    DSDA_ADD_CONTEXT(sf_hud);
-    HU_Drawer();
-    DSDA_REMOVE_CONTEXT(sf_hud);
+      DSDA_ADD_CONTEXT(sf_hud);
+      HU_Drawer();
+      DSDA_REMOVE_CONTEXT(sf_hud);
+    }
   }
 
   isborderstate      = isborder;
