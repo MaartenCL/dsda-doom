@@ -61,6 +61,7 @@ typedef enum {
   dsda_arg_first_input,
   dsda_arg_command,
   dsda_arg_viewcam,
+  dsda_arg_viewcam_script,
   dsda_arg_skipsec,
   dsda_arg_skiptic,
   dsda_arg_takesec,

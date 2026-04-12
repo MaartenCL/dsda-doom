@@ -99,6 +99,7 @@
 #include "dsda/skip.h"
 #include "dsda/stretch.h"
 #include "dsda/utility.h"
+#include "dsda/viewcam_script.h"
 
 dboolean wasWiped = false;
 
@@ -229,6 +230,10 @@ void e6y_InitCommandLine(void)
     angle = strtof(arg->value.v_string_array[3], NULL);
     dsda_viewcam_angle = dsda_DegreesToAngle(angle);
   }
+
+  arg = dsda_Arg(dsda_arg_viewcam_script);
+  if (arg->found)
+    dsda_LoadViewcamScript(arg->value.v_string);
 
   dsda_ReadCommandLine();
 

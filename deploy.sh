@@ -6,6 +6,11 @@ SOURCE_BIN="${SCRIPT_DIR}/build/dsda-doom"
 DEST_DIR="${1:-/data/games/doom/dsda}"
 DEST_BIN="${DEST_DIR}/dsda-doom"
 
+cd "${SCRIPT_DIR}/build"
+cmake ../prboom2 -DCMAKE_BUILD_TYPE=Release
+make
+cd ..
+
 if [[ ! -x "${SOURCE_BIN}" ]]; then
 	echo "Build output not found or not executable: ${SOURCE_BIN}" >&2
 	echo "Run: cmake --build ${SCRIPT_DIR}/build" >&2

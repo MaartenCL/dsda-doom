@@ -117,6 +117,7 @@
 #include "dsda/tracker.h"
 #include "dsda/split_tracker.h"
 #include "dsda/utility.h"
+#include "dsda/viewcam_script.h"
 
 // Allows use of HELP2 screen for PWADs under DOOM 1
 int pwad_help2_check;
@@ -4115,8 +4116,42 @@ void P_WalkTicker()
   int forward;
   int side;
   int angturn;
+  static dboolean script_active_last_tic;
 
-  if (dsda_viewcam_enabled)
+  if (demoplayback && dsda_HasViewcamScript())
+  {
+    fixed_t x;
+    fixed_t y;
+    fixed_t z;
+    angle_t angle;
+
+    if (dsda_EvaluateViewcamScript(dsda_DemoTic(), &x, &y, &z, &angle))
+    {
+      walkcamera.type = 2;
+      walkcamera.x = x;
+      walkcamera.y = y;
+      walkcamera.z = z;
+      walkcamera.angle = angle;
+      walkcamera.pitch = 0;
+
+      if (!script_active_last_tic)
+      {
+        walkcamera.PrevX = walkcamera.x;
+        walkcamera.PrevY = walkcamera.y;
+        walkcamera.PrevZ = walkcamera.z;
+        walkcamera.PrevAngle = walkcamera.angle;
+        walkcamera.PrevPitch = walkcamera.pitch;
+      }
+
+      script_active_last_tic = true;
+      return;
+    }
+
+    walkcamera.type = 0;
+    script_active_last_tic = false;
+  }
+
+  if (dsda_viewcam_enabled && !dsda_HasViewcamScript())
   {
     dsda_ApplyViewcam();
     return;
