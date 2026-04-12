@@ -64,11 +64,11 @@ typedef struct {
       fixed_t x1;
       fixed_t y1;
       fixed_t z1;
-      angle_t a1;
+      angle_t angle_start;
       fixed_t x2;
       fixed_t y2;
       fixed_t z2;
-      angle_t a2;
+      angle_t angle_delta;
     } linear;
 
     struct {
@@ -79,8 +79,8 @@ typedef struct {
       fixed_t z2;
       float rot_start;
       float rot_delta;
-      angle_t a1;
-      angle_t a2;
+      angle_t angle_start;
+      angle_t angle_delta;
     } arc;
   } data;
 } dsda_viewcam_instruction_t;
@@ -215,6 +215,11 @@ static angle_t dsda_InterpolateAngle(angle_t a, angle_t b, double t)
   return (angle_t) (a + (int32_t) M_DoubleToInt(delta * t));
 }
 
+static angle_t dsda_ApplyAngleDelta(angle_t start, angle_t delta, double t)
+{
+  return (angle_t) (start + (int32_t) M_DoubleToInt((int32_t) delta * t));
+}
+
 static angle_t dsda_DirectionAngle(fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2)
 {
   float dx;
@@ -320,11 +325,11 @@ void dsda_LoadViewcamScript(const char *path)
       if (!dsda_ParseFixedToken(tokens[3], &instruction.data.linear.x1) ||
           !dsda_ParseFixedToken(tokens[4], &instruction.data.linear.y1) ||
           !dsda_ParseFixedToken(tokens[5], &instruction.data.linear.z1) ||
-          !dsda_ParseAngleToken(tokens[6], &instruction.data.linear.a1) ||
+          !dsda_ParseAngleToken(tokens[6], &instruction.data.linear.angle_start) ||
           !dsda_ParseFixedToken(tokens[7], &instruction.data.linear.x2) ||
           !dsda_ParseFixedToken(tokens[8], &instruction.data.linear.y2) ||
           !dsda_ParseFixedToken(tokens[9], &instruction.data.linear.z2) ||
-          !dsda_ParseAngleToken(tokens[10], &instruction.data.linear.a2))
+          !dsda_ParseAngleToken(tokens[10], &instruction.data.linear.angle_delta))
         dsda_ViewcamScriptError(path, line_number, "invalid linear parameters");
 
       if (token_count == 12)
@@ -350,8 +355,8 @@ void dsda_LoadViewcamScript(const char *path)
           !dsda_ParseFixedToken(tokens[7], &instruction.data.arc.z2) ||
           !dsda_ParseFloatToken(tokens[8], &instruction.data.arc.rot_start) ||
           !dsda_ParseFloatToken(tokens[9], &instruction.data.arc.rot_delta) ||
-          !dsda_ParseAngleToken(tokens[10], &instruction.data.arc.a1) ||
-          !dsda_ParseAngleToken(tokens[11], &instruction.data.arc.a2))
+          !dsda_ParseAngleToken(tokens[10], &instruction.data.arc.angle_start) ||
+          !dsda_ParseAngleToken(tokens[11], &instruction.data.arc.angle_delta))
         dsda_ViewcamScriptError(path, line_number, "invalid arc parameters");
 
       if (token_count == 13)
@@ -428,7 +433,11 @@ dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z,
       *y = dsda_InterpolateFixed(instruction->data.linear.y1, instruction->data.linear.y2, t);
       *z = dsda_InterpolateFixed(instruction->data.linear.z1, instruction->data.linear.z2, t);
 
-      offset = dsda_InterpolateAngle(instruction->data.linear.a1, instruction->data.linear.a2, t);
+      offset = dsda_ApplyAngleDelta(
+        instruction->data.linear.angle_start,
+        instruction->data.linear.angle_delta,
+        t
+      );
 
       if (instruction->orientation == dsda_viewcam_orientation_movement)
         *angle = dsda_DirectionAngle(
@@ -462,7 +471,11 @@ dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z,
       *y = dsda_FloatToFixed(cy + radius * sinf(theta_rad));
       *z = dsda_InterpolateFixed(instruction->data.arc.z1, instruction->data.arc.z2, t);
 
-      offset = dsda_InterpolateAngle(instruction->data.arc.a1, instruction->data.arc.a2, t);
+      offset = dsda_ApplyAngleDelta(
+        instruction->data.arc.angle_start,
+        instruction->data.arc.angle_delta,
+        t
+      );
 
       if (instruction->orientation == dsda_viewcam_orientation_movement)
       {

@@ -30,28 +30,30 @@ Camera remains fixed between `first` and `last`.
 
 ### Linear
 
-`first last linear x1 y1 z1 a1 x2 y2 z2 a2 [orientation]`
+`first last linear x1 y1 z1 angle_start x2 y2 z2 angle_delta [orientation]`
 
 - Position interpolates linearly from point 1 to point 2.
-- Angle is interpolated from `a1` to `a2`.
+- `angle_start` is the starting angle.
+- `angle_delta` is the total angle delta applied over the full range.
 - `orientation` is optional and defaults to `absolute`.
 - Allowed orientations:
    - `absolute`: use interpolated angle directly
-   - `movement`: camera heading follows movement direction, with `a1..a2` used as angle offsets
+   - `movement`: camera heading follows movement direction, with `angle_start` as the starting offset and `angle_delta` as the total offset delta
 
 ### Arc
 
-`first last arc cx cy radius z1 z2 rot_start rot_delta a1 a2 [orientation]`
+`first last arc cx cy radius z1 z2 rot_start rot_delta angle_start angle_delta [orientation]`
 
 - Camera moves on a circle centered at `(cx, cy)` with `radius`.
 - Rotation in degrees starts at `rot_start` and progresses by `rot_delta` over the range.
 - `z` interpolates from `z1` to `z2`.
-- `a1..a2` are interpolated angle values.
+- `angle_start` is the starting angle.
+- `angle_delta` is the total angle delta applied over the full range.
 - `orientation` is optional and defaults to `absolute`.
 - Allowed orientations:
    - `absolute`: use interpolated angle directly
-   - `movement`: heading follows tangent direction, plus `a1..a2` offset
-   - `center`: heading points toward circle center, plus `a1..a2` offset
+   - `movement`: heading follows tangent direction, plus the `angle_start` starting offset and `angle_delta` total offset delta
+   - `center`: heading points toward circle center, plus the `angle_start` starting offset and `angle_delta` total offset delta
 
 ## Example
 
