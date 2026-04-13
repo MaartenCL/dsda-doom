@@ -1,6 +1,6 @@
 # Viewcam Script
 
-Use `-viewcam_script <path>` to load a scripted playback camera timeline.
+Use `-viewcam <path>` to load a scripted playback camera timeline.
 
 - The script is only evaluated during demo playback.
 - Each non-empty, non-comment line defines one instruction.

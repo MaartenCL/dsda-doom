@@ -241,8 +241,8 @@ set(COMMON_SRC
     dsda/utility.h
     dsda/utility/string_view.c
     dsda/utility/string_view.h
-    dsda/viewcam_script.c
-    dsda/viewcam_script.h
+    dsda/viewcam.c
+    dsda/viewcam.h
     dsda/wad_stats.c
     dsda/wad_stats.h
     dsda/zipfile.c

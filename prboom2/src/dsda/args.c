@@ -248,8 +248,8 @@ static arg_config_t arg_config[dsda_arg_count] = {
     "runs a console command",
     arg_string
   },
-  [dsda_arg_viewcam_script] = {
-    "-viewcam_script", NULL, NULL,
+  [dsda_arg_viewcam] = {
+    "-viewcam", NULL, NULL,
     "loads a scripted playback camera file",
     arg_string,
   },

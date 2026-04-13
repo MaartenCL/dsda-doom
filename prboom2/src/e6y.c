@@ -99,7 +99,7 @@
 #include "dsda/skip.h"
 #include "dsda/stretch.h"
 #include "dsda/utility.h"
-#include "dsda/viewcam_script.h"
+#include "dsda/viewcam.h"
 
 dboolean wasWiped = false;
 
@@ -213,7 +213,7 @@ void e6y_InitCommandLine(void)
   if ((stroller = dsda_Flag(dsda_arg_stroller)))
     dsda_UpdateIntArg(dsda_arg_turbo, "50");
 
-  arg = dsda_Arg(dsda_arg_viewcam_script);
+  arg = dsda_Arg(dsda_arg_viewcam);
   if (arg->found)
     dsda_LoadViewcamScript(arg->value.v_string);
 

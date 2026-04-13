@@ -32,7 +32,7 @@
 #include "z_zone.h"
 
 #include "dsda/utility.h"
-#include "dsda/viewcam_script.h"
+#include "dsda/viewcam.h"
 
 typedef enum {
   dsda_viewcam_action_static,
@@ -85,8 +85,8 @@ typedef struct {
   } data;
 } dsda_viewcam_instruction_t;
 
-static dsda_viewcam_instruction_t *dsda_viewcam_script = NULL;
-static int dsda_viewcam_script_count = 0;
+static dsda_viewcam_instruction_t *dsda_viewcam = NULL;
+static int dsda_viewcam_count = 0;
 
 #define DSDA_MAX_VIEWCAM_TOKENS 16
 #define DSDA_PI 3.14159265358979323846f
@@ -239,9 +239,9 @@ static angle_t dsda_DirectionAngle(fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y
 
 void dsda_ClearViewcamScript(void)
 {
-  Z_Free(dsda_viewcam_script);
-  dsda_viewcam_script = NULL;
-  dsda_viewcam_script_count = 0;
+  Z_Free(dsda_viewcam);
+  dsda_viewcam = NULL;
+  dsda_viewcam_count = 0;
 }
 
 void dsda_LoadViewcamScript(const char *path)
@@ -370,12 +370,12 @@ void dsda_LoadViewcamScript(const char *path)
     else
       dsda_ViewcamScriptError(path, line_number, "unknown action '%s'", tokens[2]);
 
-    ++dsda_viewcam_script_count;
-    dsda_viewcam_script = Z_Realloc(
-      dsda_viewcam_script,
-      dsda_viewcam_script_count * sizeof(*dsda_viewcam_script)
+    ++dsda_viewcam_count;
+    dsda_viewcam = Z_Realloc(
+      dsda_viewcam,
+      dsda_viewcam_count * sizeof(*dsda_viewcam)
     );
-    dsda_viewcam_script[dsda_viewcam_script_count - 1] = instruction;
+    dsda_viewcam[dsda_viewcam_count - 1] = instruction;
 
     line = next_line;
     ++line_number;
@@ -383,13 +383,13 @@ void dsda_LoadViewcamScript(const char *path)
 
   Z_Free(buffer);
 
-  if (!dsda_viewcam_script_count)
+  if (!dsda_viewcam_count)
     I_Error("Viewcam script file %s has no instructions", path);
 }
 
 dboolean dsda_HasViewcamScript(void)
 {
-  return dsda_viewcam_script_count > 0;
+  return dsda_viewcam_count > 0;
 }
 
 dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z, angle_t *angle)
@@ -399,10 +399,10 @@ dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z,
   double t;
   angle_t offset;
 
-  for (i = 0; i < dsda_viewcam_script_count; ++i)
+  for (i = 0; i < dsda_viewcam_count; ++i)
   {
-    if (tic >= dsda_viewcam_script[i].first_tic && tic <= dsda_viewcam_script[i].last_tic)
-      instruction = &dsda_viewcam_script[i];
+    if (tic >= dsda_viewcam[i].first_tic && tic <= dsda_viewcam[i].last_tic)
+      instruction = &dsda_viewcam[i];
   }
 
   if (!instruction)

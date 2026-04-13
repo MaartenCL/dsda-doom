@@ -117,7 +117,7 @@
 #include "dsda/tracker.h"
 #include "dsda/split_tracker.h"
 #include "dsda/utility.h"
-#include "dsda/viewcam_script.h"
+#include "dsda/viewcam.h"
 
 // Allows use of HELP2 screen for PWADs under DOOM 1
 int pwad_help2_check;

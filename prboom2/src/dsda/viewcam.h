@@ -15,8 +15,8 @@
 //   DSDA Viewcam Script
 //
 
-#ifndef __DSDA_VIEWCAM_SCRIPT__
-#define __DSDA_VIEWCAM_SCRIPT__
+#ifndef __DSDA_VIEWCAM__
+#define __DSDA_VIEWCAM__
 
 #include "doomtype.h"
 
