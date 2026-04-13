@@ -55,6 +55,20 @@ Camera remains fixed between `first` and `last`.
    - `movement`: heading follows tangent direction, plus the `angle_start` starting offset and `angle_delta` total offset delta
    - `center`: heading points toward circle center, plus the `angle_start` starting offset and `angle_delta` total offset delta
 
+### Bezier
+
+`first last bezier point_count x1 y1 z1 ... xn yn zn angle_start angle_delta [orientation]`
+
+- Camera position follows an $n$-point Bezier curve with uniform $t$ interpolation over the tic range.
+- `point_count` must be at least `2`.
+- Control points are listed as flat triples: `x y z` repeated `point_count` times.
+- `angle_start` is the starting angle.
+- `angle_delta` is the total angle delta applied over the full range.
+- `orientation` is optional and defaults to `absolute`.
+- Allowed orientations:
+   - `absolute`: use interpolated angle directly
+   - `movement`: heading follows the Bezier tangent direction, plus the `angle_start` starting offset and `angle_delta` total offset delta
+
 ## Example
 
 ```text
@@ -66,6 +80,9 @@ Camera remains fixed between `first` and `last`.
 
 # Orbit around arena center while looking at center
 701 1400 arc 1536 1536 512 0 360 96 96 0 0 center
+
+# Follow a cubic Bezier camera path, facing movement direction
+1401 2000 bezier 4 1536 1536 96 1792 1664 104 2048 1408 112 2304 1536 120 0 45 movement
 ```
 
 ## Errors

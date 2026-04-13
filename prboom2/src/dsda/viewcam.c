@@ -38,6 +38,7 @@ typedef enum {
   dsda_viewcam_action_static,
   dsda_viewcam_action_linear,
   dsda_viewcam_action_arc,
+  dsda_viewcam_action_bezier,
 } dsda_viewcam_action_t;
 
 typedef enum {
@@ -82,13 +83,20 @@ typedef struct {
       angle_t angle_start;
       angle_t angle_delta;
     } arc;
+
+    struct {
+      int point_count;
+      fixed_t *points;
+      angle_t angle_start;
+      angle_t angle_delta;
+    } bezier;
   } data;
 } dsda_viewcam_instruction_t;
 
 static dsda_viewcam_instruction_t *dsda_viewcam = NULL;
 static int dsda_viewcam_count = 0;
 
-#define DSDA_MAX_VIEWCAM_TOKENS 16
+#define DSDA_MAX_VIEWCAM_TOKENS 512
 #define DSDA_PI 3.14159265358979323846f
 
 static void dsda_ViewcamScriptError(const char *path, int line_number, const char *format, ...)
@@ -206,15 +214,6 @@ static fixed_t dsda_InterpolateFixed(fixed_t a, fixed_t b, double t)
   return a + (fixed_t) M_DoubleToInt((double) (b - a) * t);
 }
 
-static angle_t dsda_InterpolateAngle(angle_t a, angle_t b, double t)
-{
-  int32_t delta;
-
-  delta = (int32_t) (b - a);
-
-  return (angle_t) (a + (int32_t) M_DoubleToInt(delta * t));
-}
-
 static angle_t dsda_ApplyAngleDelta(angle_t start, angle_t delta, double t)
 {
   return (angle_t) (start + (int32_t) M_DoubleToInt((int32_t) delta * t));
@@ -237,8 +236,144 @@ static angle_t dsda_DirectionAngle(fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y
   return dsda_DegreesToAngle(degrees);
 }
 
+static angle_t dsda_DirectionAngleFromVector(double dx, double dy)
+{
+  float degrees;
+
+  if (dx == 0.0 && dy == 0.0)
+    return 0;
+
+  degrees = (float) ((atan2(dy, dx) * 180.0) / DSDA_PI);
+
+  return dsda_DegreesToAngle(degrees);
+}
+
+static void dsda_EvaluateBezierPoint(const fixed_t *points, int point_count, double t,
+                                     fixed_t *x, fixed_t *y, fixed_t *z)
+{
+  int degree;
+  double inv_t;
+  double basis;
+  double ratio;
+  double px, py, pz;
+  int i;
+
+  if (point_count <= 0)
+  {
+    *x = *y = *z = 0;
+    return;
+  }
+
+  if (t <= 0.0)
+  {
+    *x = points[0];
+    *y = points[1];
+    *z = points[2];
+    return;
+  }
+
+  if (t >= 1.0)
+  {
+    int base = (point_count - 1) * 3;
+    *x = points[base + 0];
+    *y = points[base + 1];
+    *z = points[base + 2];
+    return;
+  }
+
+  degree = point_count - 1;
+  inv_t = 1.0 - t;
+  basis = pow(inv_t, degree);
+  ratio = t / inv_t;
+
+  px = py = pz = 0.0;
+
+  for (i = 0; i <= degree; ++i)
+  {
+    int base = i * 3;
+
+    px += basis * ((double) points[base + 0] / FRACUNIT);
+    py += basis * ((double) points[base + 1] / FRACUNIT);
+    pz += basis * ((double) points[base + 2] / FRACUNIT);
+
+    if (i < degree)
+      basis *= ((double) (degree - i) / (double) (i + 1)) * ratio;
+  }
+
+  *x = dsda_FloatToFixed((float) px);
+  *y = dsda_FloatToFixed((float) py);
+  *z = dsda_FloatToFixed((float) pz);
+}
+
+static void dsda_EvaluateBezierDerivative(const fixed_t *points, int point_count, double t,
+                                          double *dx, double *dy)
+{
+  int degree;
+  int ddegree;
+  double inv_t;
+  double basis;
+  double ratio;
+  double vx, vy;
+  int i;
+
+  if (point_count <= 1)
+  {
+    *dx = 0.0;
+    *dy = 0.0;
+    return;
+  }
+
+  degree = point_count - 1;
+
+  if (t <= 0.0)
+  {
+    *dx = degree * ((double) (points[3] - points[0]) / FRACUNIT);
+    *dy = degree * ((double) (points[4] - points[1]) / FRACUNIT);
+    return;
+  }
+
+  if (t >= 1.0)
+  {
+    int p0 = (point_count - 2) * 3;
+    int p1 = (point_count - 1) * 3;
+    *dx = degree * ((double) (points[p1 + 0] - points[p0 + 0]) / FRACUNIT);
+    *dy = degree * ((double) (points[p1 + 1] - points[p0 + 1]) / FRACUNIT);
+    return;
+  }
+
+  ddegree = degree - 1;
+  inv_t = 1.0 - t;
+  basis = pow(inv_t, ddegree);
+  ratio = t / inv_t;
+
+  vx = vy = 0.0;
+
+  for (i = 0; i <= ddegree; ++i)
+  {
+    int p0 = i * 3;
+    int p1 = (i + 1) * 3;
+
+    vx += basis * ((double) (points[p1 + 0] - points[p0 + 0]) / FRACUNIT);
+    vy += basis * ((double) (points[p1 + 1] - points[p0 + 1]) / FRACUNIT);
+
+    if (i < ddegree)
+      basis *= ((double) (ddegree - i) / (double) (i + 1)) * ratio;
+  }
+
+  *dx = degree * vx;
+  *dy = degree * vy;
+}
+
 void dsda_ClearViewcamScript(void)
 {
+  int i;
+
+  for (i = 0; i < dsda_viewcam_count; ++i)
+  {
+    if (dsda_viewcam[i].action == dsda_viewcam_action_bezier)
+      Z_Free(dsda_viewcam[i].data.bezier.points);
+  }
+
   Z_Free(dsda_viewcam);
   dsda_viewcam = NULL;
   dsda_viewcam_count = 0;
@@ -367,6 +502,57 @@ void dsda_LoadViewcamScript(const char *path)
           dsda_ViewcamScriptError(path, line_number, "invalid arc orientation '%s'", tokens[12]);
       }
     }
+    else if (!strcasecmp(tokens[2], "bezier"))
+    {
+      int point_count;
+      int token_count_without_orientation;
+      int token_count_with_orientation;
+      int angle_start_index;
+      int angle_delta_index;
+      int i;
+
+      instruction.action = dsda_viewcam_action_bezier;
+      instruction.orientation = dsda_viewcam_orientation_absolute;
+
+      if (token_count < 12)
+        dsda_ViewcamScriptError(path, line_number, "bezier expects at least 12 tokens");
+
+      if (!dsda_ParseIntToken(tokens[3], &point_count))
+        dsda_ViewcamScriptError(path, line_number, "invalid bezier point count '%s'", tokens[3]);
+
+      if (point_count < 2)
+        dsda_ViewcamScriptError(path, line_number, "bezier point count must be at least 2");
+
+      token_count_without_orientation = 6 + point_count * 3;
+      token_count_with_orientation = token_count_without_orientation + 1;
+
+      if (token_count != token_count_without_orientation && token_count != token_count_with_orientation)
+        dsda_ViewcamScriptError(path, line_number, "bezier token count does not match point count");
+
+      instruction.data.bezier.point_count = point_count;
+      instruction.data.bezier.points = Z_Malloc(point_count * 3 * sizeof(fixed_t));
+
+      for (i = 0; i < point_count * 3; ++i)
+      {
+        if (!dsda_ParseFixedToken(tokens[4 + i], &instruction.data.bezier.points[i]))
+          dsda_ViewcamScriptError(path, line_number, "invalid bezier control point parameter");
+      }
+
+      angle_start_index = 4 + point_count * 3;
+      angle_delta_index = angle_start_index + 1;
+
+      if (!dsda_ParseAngleToken(tokens[angle_start_index], &instruction.data.bezier.angle_start) ||
+          !dsda_ParseAngleToken(tokens[angle_delta_index], &instruction.data.bezier.angle_delta))
+        dsda_ViewcamScriptError(path, line_number, "invalid bezier angle parameters");
+
+      if (token_count == token_count_with_orientation)
+      {
+        instruction.orientation = dsda_ParseOrientationToken(tokens[angle_delta_index + 1], false);
+
+        if (instruction.orientation == -1)
+          dsda_ViewcamScriptError(path, line_number, "invalid bezier orientation '%s'", tokens[angle_delta_index + 1]);
+      }
+    }
     else
       dsda_ViewcamScriptError(path, line_number, "unknown action '%s'", tokens[2]);
 
@@ -486,6 +672,45 @@ dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z,
       }
       else if (instruction->orientation == dsda_viewcam_orientation_center)
         base_angle = dsda_DirectionAngle(*x, *y, instruction->data.arc.cx, instruction->data.arc.cy);
+      else
+        base_angle = 0;
+
+      *angle = base_angle + offset;
+      return true;
+    }
+
+    case dsda_viewcam_action_bezier:
+    {
+      double dx;
+      double dy;
+      angle_t base_angle;
+
+      dsda_EvaluateBezierPoint(
+        instruction->data.bezier.points,
+        instruction->data.bezier.point_count,
+        t,
+        x,
+        y,
+        z
+      );
+
+      offset = dsda_ApplyAngleDelta(
+        instruction->data.bezier.angle_start,
+        instruction->data.bezier.angle_delta,
+        t
+      );
+
+      if (instruction->orientation == dsda_viewcam_orientation_movement)
+      {
+        dsda_EvaluateBezierDerivative(
+          instruction->data.bezier.points,
+          instruction->data.bezier.point_count,
+          t,
+          &dx,
+          &dy
+        );
+        base_angle = dsda_DirectionAngleFromVector(dx, dy);
+      }
       else
         base_angle = 0;
 
