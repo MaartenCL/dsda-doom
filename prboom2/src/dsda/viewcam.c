@@ -325,10 +325,10 @@ void dsda_LoadViewcamScript(const char *path)
       if (!dsda_ParseFixedToken(tokens[3], &instruction.data.linear.x1) ||
           !dsda_ParseFixedToken(tokens[4], &instruction.data.linear.y1) ||
           !dsda_ParseFixedToken(tokens[5], &instruction.data.linear.z1) ||
-          !dsda_ParseAngleToken(tokens[6], &instruction.data.linear.angle_start) ||
-          !dsda_ParseFixedToken(tokens[7], &instruction.data.linear.x2) ||
-          !dsda_ParseFixedToken(tokens[8], &instruction.data.linear.y2) ||
-          !dsda_ParseFixedToken(tokens[9], &instruction.data.linear.z2) ||
+          !dsda_ParseFixedToken(tokens[6], &instruction.data.linear.x2) ||
+          !dsda_ParseFixedToken(tokens[7], &instruction.data.linear.y2) ||
+          !dsda_ParseFixedToken(tokens[8], &instruction.data.linear.z2) ||
+          !dsda_ParseAngleToken(tokens[9], &instruction.data.linear.angle_start) ||
           !dsda_ParseAngleToken(tokens[10], &instruction.data.linear.angle_delta))
         dsda_ViewcamScriptError(path, line_number, "invalid linear parameters");
 
@@ -351,10 +351,10 @@ void dsda_LoadViewcamScript(const char *path)
       if (!dsda_ParseFixedToken(tokens[3], &instruction.data.arc.cx) ||
           !dsda_ParseFixedToken(tokens[4], &instruction.data.arc.cy) ||
           !dsda_ParseFixedToken(tokens[5], &instruction.data.arc.radius) ||
-          !dsda_ParseFixedToken(tokens[6], &instruction.data.arc.z1) ||
-          !dsda_ParseFixedToken(tokens[7], &instruction.data.arc.z2) ||
-          !dsda_ParseFloatToken(tokens[8], &instruction.data.arc.rot_start) ||
-          !dsda_ParseFloatToken(tokens[9], &instruction.data.arc.rot_delta) ||
+          !dsda_ParseFloatToken(tokens[6], &instruction.data.arc.rot_start) ||
+          !dsda_ParseFloatToken(tokens[7], &instruction.data.arc.rot_delta) ||
+          !dsda_ParseFixedToken(tokens[8], &instruction.data.arc.z1) ||
+          !dsda_ParseFixedToken(tokens[9], &instruction.data.arc.z2) ||
           !dsda_ParseAngleToken(tokens[10], &instruction.data.arc.angle_start) ||
           !dsda_ParseAngleToken(tokens[11], &instruction.data.arc.angle_delta))
         dsda_ViewcamScriptError(path, line_number, "invalid arc parameters");

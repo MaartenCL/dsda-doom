@@ -30,7 +30,7 @@ Camera remains fixed between `first` and `last`.
 
 ### Linear
 
-`first last linear x1 y1 z1 angle_start x2 y2 z2 angle_delta [orientation]`
+`first last linear x1 y1 z1 x2 y2 z2 angle_start angle_delta [orientation]`
 
 - Position interpolates linearly from point 1 to point 2.
 - `angle_start` is the starting angle.
@@ -42,7 +42,7 @@ Camera remains fixed between `first` and `last`.
 
 ### Arc
 
-`first last arc cx cy radius z1 z2 rot_start rot_delta angle_start angle_delta [orientation]`
+`first last arc cx cy radius rot_start rot_delta z1 z2 angle_start angle_delta [orientation]`
 
 - Camera moves on a circle centered at `(cx, cy)` with `radius`.
 - Rotation in degrees starts at `rot_start` and progresses by `rot_delta` over the range.
@@ -62,10 +62,10 @@ Camera remains fixed between `first` and `last`.
 0 175 static 1024 2048 64 90
 
 # Linear fly-through, look along movement
-176 700 linear 1024 2048 64 0 2048 2048 96 0 movement
+176 700 linear 1024 2048 64 2048 2048 96 0 0 movement
 
 # Orbit around arena center while looking at center
-701 1400 arc 1536 1536 512 96 96 0 360 0 0 center
+701 1400 arc 1536 1536 512 0 360 96 96 0 0 center
 ```
 
 ## Errors
