@@ -248,11 +248,6 @@ static arg_config_t arg_config[dsda_arg_count] = {
     "runs a console command",
     arg_string
   },
-  [dsda_arg_viewcam] = {
-    "-viewcam", NULL, NULL,
-    "sets fixed camera view for playback (x y z angle_degrees)",
-    arg_string_array, EXACT_ARRAY_LENGTH(4),
-  },
   [dsda_arg_viewcam_script] = {
     "-viewcam_script", NULL, NULL,
     "loads a scripted playback camera file",

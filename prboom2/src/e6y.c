@@ -113,12 +113,6 @@ int gl_render_fov = 90;
 
 camera_t walkcamera;
 
-dboolean dsda_viewcam_enabled;
-fixed_t dsda_viewcam_x;
-fixed_t dsda_viewcam_y;
-fixed_t dsda_viewcam_z;
-angle_t dsda_viewcam_angle;
-
 angle_t viewpitch;
 float skyscale;
 float screen_skybox_zplane;
@@ -213,23 +207,11 @@ void M_ChangeShorttics(void)
 void e6y_InitCommandLine(void)
 {
   dsda_arg_t* arg;
-  float angle;
 
   stats_level = dsda_Flag(dsda_arg_levelstat);
 
   if ((stroller = dsda_Flag(dsda_arg_stroller)))
     dsda_UpdateIntArg(dsda_arg_turbo, "50");
-
-  arg = dsda_Arg(dsda_arg_viewcam);
-  if (arg->found)
-  {
-    dsda_viewcam_enabled = true;
-    dsda_viewcam_x = dsda_StringToFixed(arg->value.v_string_array[0]);
-    dsda_viewcam_y = dsda_StringToFixed(arg->value.v_string_array[1]);
-    dsda_viewcam_z = dsda_StringToFixed(arg->value.v_string_array[2]);
-    angle = strtof(arg->value.v_string_array[3], NULL);
-    dsda_viewcam_angle = dsda_DegreesToAngle(angle);
-  }
 
   arg = dsda_Arg(dsda_arg_viewcam_script);
   if (arg->found)
@@ -238,25 +220,6 @@ void e6y_InitCommandLine(void)
   dsda_ReadCommandLine();
 
   M_ChangeShorttics();
-}
-
-void dsda_ApplyViewcam(void)
-{
-  if (!dsda_viewcam_enabled || !demoplayback)
-    return;
-
-  walkcamera.type = 2;
-  walkcamera.x = dsda_viewcam_x;
-  walkcamera.y = dsda_viewcam_y;
-  walkcamera.z = dsda_viewcam_z;
-  walkcamera.angle = dsda_viewcam_angle;
-  walkcamera.pitch = 0;
-
-  walkcamera.PrevX = walkcamera.x;
-  walkcamera.PrevY = walkcamera.y;
-  walkcamera.PrevZ = walkcamera.z;
-  walkcamera.PrevAngle = walkcamera.angle;
-  walkcamera.PrevPitch = walkcamera.pitch;
 }
 
 int G_ReloadLevel(void)

@@ -77,11 +77,6 @@ void M_ChangeAspectRatio(void);
 void M_ChangeStretch(void);
 
 extern camera_t walkcamera;
-extern dboolean dsda_viewcam_enabled;
-extern fixed_t dsda_viewcam_x;
-extern fixed_t dsda_viewcam_y;
-extern fixed_t dsda_viewcam_z;
-extern angle_t dsda_viewcam_angle;
 
 extern int PitchSign;
 extern angle_t viewpitch;
@@ -97,7 +92,6 @@ extern float skyYShift;
 void ParamsMatchingCheck();
 void e6y_HandleSkip(void);
 void e6y_InitCommandLine(void);
-void dsda_ApplyViewcam(void);
 
 void P_WalkTicker ();
 void P_SyncWalkcam(dboolean sync_coords, dboolean sync_sight);

@@ -4151,12 +4151,6 @@ void P_WalkTicker()
     script_active_last_tic = false;
   }
 
-  if (dsda_viewcam_enabled && !dsda_HasViewcamScript())
-  {
-    dsda_ApplyViewcam();
-    return;
-  }
-
   if (!walkcamera.type || menuactive)
     return;
 
