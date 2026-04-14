@@ -18,9 +18,12 @@
 #include "base.h"
 
 #include "line_display.h"
+#include "dsda/demo.h"
+
+#define LINE_DISPLAY_ROWS (LINE_ACTIVATION_INDEX_MAX + 1)
 
 typedef struct {
-  dsda_text_t line_display[LINE_ACTIVATION_INDEX_MAX];
+  dsda_text_t line_display[LINE_DISPLAY_ROWS];
 } local_component_t;
 
 static local_component_t* local;
@@ -31,25 +34,34 @@ void dsda_InitLineDisplayHC(int x_offset, int y_offset, int vpt, int* args, int 
   *data = Z_Calloc(1, sizeof(local_component_t));
   local = *data;
 
-  for (i = 0; i < LINE_ACTIVATION_INDEX_MAX; ++i)
+  for (i = 0; i < LINE_DISPLAY_ROWS; ++i)
     dsda_InitTextHC(&local->line_display[i], x_offset, y_offset + i * 8, vpt);
 }
 
 void dsda_UpdateLineDisplayHC(void* data) {
   int* line_ids;
-  int i;
+  int i, j;
 
   local = data;
 
   line_ids = dsda_PlayerActivatedLines();
 
-  for (i = 0; line_ids[i] != -1; ++i) {
+  i = 0;
+
+  if ((demorecording || demoplayback)) {
+    snprintf(local->line_display[i].msg, sizeof(local->line_display[i].msg), "%sT: %d",
+             dsda_TextColor(dsda_tc_exhud_line_activation), dsda_DemoTic());
+    dsda_RefreshHudText(&local->line_display[i]);
+    ++i;
+  }
+
+  for (j = 0; line_ids[j] != -1 && i < LINE_DISPLAY_ROWS; ++j, ++i) {
     snprintf(local->line_display[i].msg, sizeof(local->line_display[i].msg), "%s%d",
-             dsda_TextColor(dsda_tc_exhud_line_activation), line_ids[i]);
+             dsda_TextColor(dsda_tc_exhud_line_activation), line_ids[j]);
     dsda_RefreshHudText(&local->line_display[i]);
   }
 
-  if (line_ids[0] != -1 && i < LINE_ACTIVATION_INDEX_MAX) {
+  if (i < LINE_DISPLAY_ROWS) {
     local->line_display[i].msg[0] = '\0';
     dsda_RefreshHudText(&local->line_display[i]);
   }
@@ -60,7 +72,7 @@ void dsda_DrawLineDisplayHC(void* data) {
 
   local = data;
 
-  for (i = 0; i < LINE_ACTIVATION_INDEX_MAX; ++i) {
+  for (i = 0; i < LINE_DISPLAY_ROWS; ++i) {
     if (!local->line_display[i].msg[0])
       break;
 

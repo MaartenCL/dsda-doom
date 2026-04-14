@@ -36,6 +36,7 @@ typedef struct {
   dsda_text_t dsda_cx_display;
   dsda_text_t dsda_cy_display;
   dsda_text_t dsda_cz_display;
+  dsda_text_t dsda_ca_display;
   dsda_text_t dsda_v_display;
   dsda_text_t dsda_vx_display;
   dsda_text_t dsda_vy_display;
@@ -178,6 +179,7 @@ void dsda_InitCoordinateDisplayHC(int x_offset, int y_offset, int vpt, int* args
   dsda_InitTextHC(&local->dsda_cx_display, x_offset, y_offset + 104, vpt);
   dsda_InitTextHC(&local->dsda_cy_display, x_offset, y_offset + 112, vpt);
   dsda_InitTextHC(&local->dsda_cz_display, x_offset, y_offset + 120, vpt);
+  dsda_InitTextHC(&local->dsda_ca_display, x_offset, y_offset + 128, vpt);
 }
 
 void dsda_UpdateCoordinateDisplayHC(void* data) {
@@ -185,6 +187,7 @@ void dsda_UpdateCoordinateDisplayHC(void* data) {
   fixed_t cam_x;
   fixed_t cam_y;
   fixed_t cam_z;
+  angle_t cam_a;
 
   local = data;
 
@@ -195,12 +198,14 @@ void dsda_UpdateCoordinateDisplayHC(void* data) {
     cam_x = walkcamera.x;
     cam_y = walkcamera.y;
     cam_z = walkcamera.z;
+    cam_a = walkcamera.angle;
   }
   else
   {
     cam_x = mo->x;
     cam_y = mo->y;
     cam_z = mo->z;
+    cam_a = mo->angle;
   }
 
   dsda_WriteCoordinate(&local->dsda_x_display, mo->x, "X");
@@ -210,6 +215,7 @@ void dsda_UpdateCoordinateDisplayHC(void* data) {
   dsda_WriteCoordinate(&local->dsda_cx_display, cam_x, "CX");
   dsda_WriteCoordinate(&local->dsda_cy_display, cam_y, "CY");
   dsda_WriteCoordinate(&local->dsda_cz_display, cam_z, "CZ");
+  dsda_WriteAngle(&local->dsda_ca_display, cam_a, "CA");
   dsda_WriteVelocity(&local->dsda_v_display);
   dsda_WriteCoordinateSimple(&local->dsda_vx_display, mo->momx, "X", dsda_velocity_color);
   dsda_WriteCoordinateSimple(&local->dsda_vy_display, mo->momy, "Y", dsda_velocity_color);
@@ -224,6 +230,7 @@ void dsda_UpdateCoordinateDisplayHC(void* data) {
   dsda_RefreshHudText(&local->dsda_cx_display);
   dsda_RefreshHudText(&local->dsda_cy_display);
   dsda_RefreshHudText(&local->dsda_cz_display);
+  dsda_RefreshHudText(&local->dsda_ca_display);
   dsda_RefreshHudText(&local->dsda_v_display);
   dsda_RefreshHudText(&local->dsda_vx_display);
   dsda_RefreshHudText(&local->dsda_vy_display);
@@ -242,6 +249,7 @@ void dsda_DrawCoordinateDisplayHC(void* data) {
   dsda_DrawBasicText(&local->dsda_cx_display);
   dsda_DrawBasicText(&local->dsda_cy_display);
   dsda_DrawBasicText(&local->dsda_cz_display);
+  dsda_DrawBasicText(&local->dsda_ca_display);
   dsda_DrawBasicText(&local->dsda_v_display);
   dsda_DrawBasicText(&local->dsda_vx_display);
   dsda_DrawBasicText(&local->dsda_vy_display);
