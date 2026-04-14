@@ -155,6 +155,50 @@ static dboolean dsda_ParseFixedToken(const char *token, fixed_t *out)
   return true;
 }
 
+static dboolean dsda_ParseFixedTripletToken(const char *token, fixed_t *x, fixed_t *y, fixed_t *z)
+{
+  const char *comma1;
+  const char *comma2;
+  char *end;
+  float value;
+
+  comma1 = strchr(token, ',');
+
+  if (!comma1)
+    return false;
+
+  comma2 = strchr(comma1 + 1, ',');
+
+  if (!comma2 || strchr(comma2 + 1, ','))
+    return false;
+
+  errno = 0;
+  value = strtof(token, &end);
+
+  if (errno || token == end || end != comma1)
+    return false;
+
+  *x = dsda_FloatToFixed(value);
+
+  errno = 0;
+  value = strtof(comma1 + 1, &end);
+
+  if (errno || comma1 + 1 == end || end != comma2)
+    return false;
+
+  *y = dsda_FloatToFixed(value);
+
+  errno = 0;
+  value = strtof(comma2 + 1, &end);
+
+  if (errno || comma2 + 1 == end || *end != '\0')
+    return false;
+
+  *z = dsda_FloatToFixed(value);
+
+  return true;
+}
+
 static dboolean dsda_ParseAngleToken(const char *token, angle_t *out)
 {
   float value;
@@ -440,13 +484,16 @@ void dsda_LoadViewcamScript(const char *path)
       instruction.action = dsda_viewcam_action_static;
       instruction.orientation = dsda_viewcam_orientation_absolute;
 
-      if (token_count != 7)
-        dsda_ViewcamScriptError(path, line_number, "static expects 7 tokens");
+      if (token_count != 5)
+        dsda_ViewcamScriptError(path, line_number, "static expects 5 tokens");
 
-      if (!dsda_ParseFixedToken(tokens[3], &instruction.data.static_action.x) ||
-          !dsda_ParseFixedToken(tokens[4], &instruction.data.static_action.y) ||
-          !dsda_ParseFixedToken(tokens[5], &instruction.data.static_action.z) ||
-          !dsda_ParseAngleToken(tokens[6], &instruction.data.static_action.angle))
+      if (!dsda_ParseFixedTripletToken(
+            tokens[3],
+            &instruction.data.static_action.x,
+            &instruction.data.static_action.y,
+            &instruction.data.static_action.z
+          ) ||
+          !dsda_ParseAngleToken(tokens[4], &instruction.data.static_action.angle))
         dsda_ViewcamScriptError(path, line_number, "invalid static parameters");
     }
     else if (!strcasecmp(tokens[2], "linear"))
@@ -454,25 +501,31 @@ void dsda_LoadViewcamScript(const char *path)
       instruction.action = dsda_viewcam_action_linear;
       instruction.orientation = dsda_viewcam_orientation_absolute;
 
-      if (token_count != 11 && token_count != 12)
-        dsda_ViewcamScriptError(path, line_number, "linear expects 11 or 12 tokens");
+      if (token_count != 7 && token_count != 8)
+        dsda_ViewcamScriptError(path, line_number, "linear expects 7 or 8 tokens");
 
-      if (!dsda_ParseFixedToken(tokens[3], &instruction.data.linear.x1) ||
-          !dsda_ParseFixedToken(tokens[4], &instruction.data.linear.y1) ||
-          !dsda_ParseFixedToken(tokens[5], &instruction.data.linear.z1) ||
-          !dsda_ParseFixedToken(tokens[6], &instruction.data.linear.x2) ||
-          !dsda_ParseFixedToken(tokens[7], &instruction.data.linear.y2) ||
-          !dsda_ParseFixedToken(tokens[8], &instruction.data.linear.z2) ||
-          !dsda_ParseAngleToken(tokens[9], &instruction.data.linear.angle_start) ||
-          !dsda_ParseAngleToken(tokens[10], &instruction.data.linear.angle_delta))
+      if (!dsda_ParseFixedTripletToken(
+            tokens[3],
+            &instruction.data.linear.x1,
+            &instruction.data.linear.y1,
+            &instruction.data.linear.z1
+          ) ||
+          !dsda_ParseFixedTripletToken(
+            tokens[4],
+            &instruction.data.linear.x2,
+            &instruction.data.linear.y2,
+            &instruction.data.linear.z2
+          ) ||
+          !dsda_ParseAngleToken(tokens[5], &instruction.data.linear.angle_start) ||
+          !dsda_ParseAngleToken(tokens[6], &instruction.data.linear.angle_delta))
         dsda_ViewcamScriptError(path, line_number, "invalid linear parameters");
 
-      if (token_count == 12)
+      if (token_count == 8)
       {
-        instruction.orientation = dsda_ParseOrientationToken(tokens[11], false);
+        instruction.orientation = dsda_ParseOrientationToken(tokens[7], false);
 
         if (instruction.orientation == -1)
-          dsda_ViewcamScriptError(path, line_number, "invalid linear orientation '%s'", tokens[11]);
+          dsda_ViewcamScriptError(path, line_number, "invalid linear orientation '%s'", tokens[7]);
       }
     }
     else if (!strcasecmp(tokens[2], "arc"))
@@ -514,8 +567,8 @@ void dsda_LoadViewcamScript(const char *path)
       instruction.action = dsda_viewcam_action_bezier;
       instruction.orientation = dsda_viewcam_orientation_absolute;
 
-      if (token_count < 12)
-        dsda_ViewcamScriptError(path, line_number, "bezier expects at least 12 tokens");
+      if (token_count < 8)
+        dsda_ViewcamScriptError(path, line_number, "bezier expects at least 8 tokens");
 
       if (!dsda_ParseIntToken(tokens[3], &point_count))
         dsda_ViewcamScriptError(path, line_number, "invalid bezier point count '%s'", tokens[3]);
@@ -523,7 +576,7 @@ void dsda_LoadViewcamScript(const char *path)
       if (point_count < 2)
         dsda_ViewcamScriptError(path, line_number, "bezier point count must be at least 2");
 
-      token_count_without_orientation = 6 + point_count * 3;
+      token_count_without_orientation = 6 + point_count;
       token_count_with_orientation = token_count_without_orientation + 1;
 
       if (token_count != token_count_without_orientation && token_count != token_count_with_orientation)
@@ -532,13 +585,18 @@ void dsda_LoadViewcamScript(const char *path)
       instruction.data.bezier.point_count = point_count;
       instruction.data.bezier.points = Z_Malloc(point_count * 3 * sizeof(fixed_t));
 
-      for (i = 0; i < point_count * 3; ++i)
+      for (i = 0; i < point_count; ++i)
       {
-        if (!dsda_ParseFixedToken(tokens[4 + i], &instruction.data.bezier.points[i]))
+        if (!dsda_ParseFixedTripletToken(
+              tokens[4 + i],
+              &instruction.data.bezier.points[i * 3 + 0],
+              &instruction.data.bezier.points[i * 3 + 1],
+              &instruction.data.bezier.points[i * 3 + 2]
+            ))
           dsda_ViewcamScriptError(path, line_number, "invalid bezier control point parameter");
       }
 
-      angle_start_index = 4 + point_count * 3;
+      angle_start_index = 4 + point_count;
       angle_delta_index = angle_start_index + 1;
 
       if (!dsda_ParseAngleToken(tokens[angle_start_index], &instruction.data.bezier.angle_start) ||

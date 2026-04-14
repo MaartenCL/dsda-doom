@@ -15,6 +15,8 @@ General form:
 
 `first_tic last_tic action ...params... [orientation]`
 
+For `static`, `linear`, and `bezier`, positions are written as comma-separated `x,y,z` triplets. `arc` keeps separate numeric parameters.
+
 Comments:
 
 - Full-line comments: start with `#`
@@ -24,13 +26,13 @@ Comments:
 
 ### Static
 
-`first last static x y z angle`
+`first last static x,y,z angle`
 
 Camera remains fixed between `first` and `last`.
 
 ### Linear
 
-`first last linear x1 y1 z1 x2 y2 z2 angle_start angle_delta [orientation]`
+`first last linear x1,y1,z1 x2,y2,z2 angle_start angle_delta [orientation]`
 
 - Position interpolates linearly from point 1 to point 2.
 - `angle_start` is the starting angle.
@@ -57,11 +59,11 @@ Camera remains fixed between `first` and `last`.
 
 ### Bezier
 
-`first last bezier point_count x1 y1 z1 ... xn yn zn angle_start angle_delta [orientation]`
+`first last bezier point_count p1x,p1y,p1z ... pnx,pny,pnz angle_start angle_delta [orientation]`
 
 - Camera position follows an $n$-point Bezier curve with uniform $t$ interpolation over the tic range.
 - `point_count` must be at least `2`.
-- Control points are listed as flat triples: `x y z` repeated `point_count` times.
+- Control points are listed as comma-separated triplets: `x,y,z` repeated `point_count` times.
 - `angle_start` is the starting angle.
 - `angle_delta` is the total angle delta applied over the full range.
 - `orientation` is optional and defaults to `absolute`.
@@ -73,16 +75,16 @@ Camera remains fixed between `first` and `last`.
 
 ```text
 # Static opening shot
-0 175 static 1024 2048 64 90
+0 175 static 1024,2048,64 90
 
 # Linear fly-through, look along movement
-176 700 linear 1024 2048 64 2048 2048 96 0 0 movement
+176 700 linear 1024,2048,64 2048,2048,96 0 0 movement
 
 # Orbit around arena center while looking at center
 701 1400 arc 1536 1536 512 0 360 96 96 0 0 center
 
 # Follow a cubic Bezier camera path, facing movement direction
-1401 2000 bezier 4 1536 1536 96 1792 1664 104 2048 1408 112 2304 1536 120 0 45 movement
+1401 2000 bezier 4 1536,1536,96 1792,1664,104 2048,1408,112 2304,1536,120 0 45 movement
 ```
 
 ## Errors
