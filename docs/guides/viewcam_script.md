@@ -26,9 +26,15 @@ Comments:
 
 ### Static
 
-`first last static x,y,z angle`
+`first last static x,y,z angle_start [angle_delta]`
 
 Camera remains fixed between `first` and `last`.
+
+- Position stays fixed for the full range.
+- `angle_start` is the starting angle.
+- `angle_delta` is optional and defaults to `0`.
+- Positive `angle_delta` rotates counter-clockwise; negative rotates clockwise.
+- `angle_delta` can be larger than `360` (or less than `-360`) to perform extra full turns.
 
 ### Linear
 
@@ -81,7 +87,7 @@ Camera remains fixed between `first` and `last`.
 
 ```text
 # Static opening shot
-0 175 static 1024,2048,64 90
+0 175 static 1024,2048,64 90 0
 
 # Linear fly-through, look along movement
 176 700 linear 1024,2048,64 2048,2048,96 0 0 movement

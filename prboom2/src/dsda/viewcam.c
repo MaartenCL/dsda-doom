@@ -58,7 +58,8 @@ typedef struct {
       fixed_t x;
       fixed_t y;
       fixed_t z;
-      angle_t angle;
+      angle_t angle_start;
+      float angle_delta_degrees;
     } static_action;
 
     struct {
@@ -484,8 +485,8 @@ void dsda_LoadViewcamScript(const char *path)
       instruction.action = dsda_viewcam_action_static;
       instruction.orientation = dsda_viewcam_orientation_absolute;
 
-      if (token_count != 5)
-        dsda_ViewcamScriptError(path, line_number, "static expects 5 tokens");
+      if (token_count != 5 && token_count != 6)
+        dsda_ViewcamScriptError(path, line_number, "static expects 5 or 6 tokens");
 
       if (!dsda_ParseFixedTripletToken(
             tokens[3],
@@ -493,8 +494,12 @@ void dsda_LoadViewcamScript(const char *path)
             &instruction.data.static_action.y,
             &instruction.data.static_action.z
           ) ||
-          !dsda_ParseAngleToken(tokens[4], &instruction.data.static_action.angle))
+          !dsda_ParseAngleToken(tokens[4], &instruction.data.static_action.angle_start))
         dsda_ViewcamScriptError(path, line_number, "invalid static parameters");
+
+      if (token_count == 6 &&
+          !dsda_ParseFloatToken(tokens[5], &instruction.data.static_action.angle_delta_degrees))
+        dsda_ViewcamScriptError(path, line_number, "invalid static angle delta '%s'", tokens[5]);
     }
     else if (!strcasecmp(tokens[2], "linear"))
     {
@@ -669,7 +674,11 @@ dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z,
       *x = instruction->data.static_action.x;
       *y = instruction->data.static_action.y;
       *z = instruction->data.static_action.z;
-      *angle = instruction->data.static_action.angle;
+      *angle = dsda_ApplyAngleDelta(
+        instruction->data.static_action.angle_start,
+        instruction->data.static_action.angle_delta_degrees,
+        t
+      );
       return true;
 
     case dsda_viewcam_action_linear:
