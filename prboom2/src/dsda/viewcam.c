@@ -69,7 +69,7 @@ typedef struct {
       fixed_t x2;
       fixed_t y2;
       fixed_t z2;
-      angle_t angle_delta;
+      float angle_delta_degrees;
     } linear;
 
     struct {
@@ -81,14 +81,14 @@ typedef struct {
       float rot_start;
       float rot_delta;
       angle_t angle_start;
-      angle_t angle_delta;
+      float angle_delta_degrees;
     } arc;
 
     struct {
       int point_count;
       fixed_t *points;
       angle_t angle_start;
-      angle_t angle_delta;
+      float angle_delta_degrees;
     } bezier;
   } data;
 } dsda_viewcam_instruction_t;
@@ -258,9 +258,9 @@ static fixed_t dsda_InterpolateFixed(fixed_t a, fixed_t b, double t)
   return a + (fixed_t) M_DoubleToInt((double) (b - a) * t);
 }
 
-static angle_t dsda_ApplyAngleDelta(angle_t start, angle_t delta, double t)
+static angle_t dsda_ApplyAngleDelta(angle_t start, float delta_degrees, double t)
 {
-  return (angle_t) (start + (int32_t) M_DoubleToInt((int32_t) delta * t));
+  return start + dsda_DegreesToAngle((float) (delta_degrees * t));
 }
 
 static angle_t dsda_DirectionAngle(fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2)
@@ -517,7 +517,7 @@ void dsda_LoadViewcamScript(const char *path)
             &instruction.data.linear.z2
           ) ||
           !dsda_ParseAngleToken(tokens[5], &instruction.data.linear.angle_start) ||
-          !dsda_ParseAngleToken(tokens[6], &instruction.data.linear.angle_delta))
+          !dsda_ParseFloatToken(tokens[6], &instruction.data.linear.angle_delta_degrees))
         dsda_ViewcamScriptError(path, line_number, "invalid linear parameters");
 
       if (token_count == 8)
@@ -544,7 +544,7 @@ void dsda_LoadViewcamScript(const char *path)
           !dsda_ParseFixedToken(tokens[8], &instruction.data.arc.z1) ||
           !dsda_ParseFixedToken(tokens[9], &instruction.data.arc.z2) ||
           !dsda_ParseAngleToken(tokens[10], &instruction.data.arc.angle_start) ||
-          !dsda_ParseAngleToken(tokens[11], &instruction.data.arc.angle_delta))
+          !dsda_ParseFloatToken(tokens[11], &instruction.data.arc.angle_delta_degrees))
         dsda_ViewcamScriptError(path, line_number, "invalid arc parameters");
 
       if (token_count == 13)
@@ -600,7 +600,7 @@ void dsda_LoadViewcamScript(const char *path)
       angle_delta_index = angle_start_index + 1;
 
       if (!dsda_ParseAngleToken(tokens[angle_start_index], &instruction.data.bezier.angle_start) ||
-          !dsda_ParseAngleToken(tokens[angle_delta_index], &instruction.data.bezier.angle_delta))
+          !dsda_ParseFloatToken(tokens[angle_delta_index], &instruction.data.bezier.angle_delta_degrees))
         dsda_ViewcamScriptError(path, line_number, "invalid bezier angle parameters");
 
       if (token_count == token_count_with_orientation)
@@ -679,7 +679,7 @@ dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z,
 
       offset = dsda_ApplyAngleDelta(
         instruction->data.linear.angle_start,
-        instruction->data.linear.angle_delta,
+        instruction->data.linear.angle_delta_degrees,
         t
       );
 
@@ -717,7 +717,7 @@ dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z,
 
       offset = dsda_ApplyAngleDelta(
         instruction->data.arc.angle_start,
-        instruction->data.arc.angle_delta,
+        instruction->data.arc.angle_delta_degrees,
         t
       );
 
@@ -754,7 +754,7 @@ dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z,
 
       offset = dsda_ApplyAngleDelta(
         instruction->data.bezier.angle_start,
-        instruction->data.bezier.angle_delta,
+        instruction->data.bezier.angle_delta_degrees,
         t
       );
 

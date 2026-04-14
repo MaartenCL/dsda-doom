@@ -37,6 +37,8 @@ Camera remains fixed between `first` and `last`.
 - Position interpolates linearly from point 1 to point 2.
 - `angle_start` is the starting angle.
 - `angle_delta` is the total angle delta applied over the full range.
+- Positive `angle_delta` rotates counter-clockwise; negative rotates clockwise.
+- `angle_delta` can be larger than `360` (or less than `-360`) to perform extra full turns.
 - `orientation` is optional and defaults to `absolute`.
 - Allowed orientations:
    - `absolute`: use interpolated angle directly
@@ -51,6 +53,8 @@ Camera remains fixed between `first` and `last`.
 - `z` interpolates from `z1` to `z2`.
 - `angle_start` is the starting angle.
 - `angle_delta` is the total angle delta applied over the full range.
+- Positive `angle_delta` rotates counter-clockwise; negative rotates clockwise.
+- `angle_delta` can be larger than `360` (or less than `-360`) to perform extra full turns.
 - `orientation` is optional and defaults to `absolute`.
 - Allowed orientations:
    - `absolute`: use interpolated angle directly
@@ -66,6 +70,8 @@ Camera remains fixed between `first` and `last`.
 - Control points are listed as comma-separated triplets: `x,y,z` repeated `point_count` times.
 - `angle_start` is the starting angle.
 - `angle_delta` is the total angle delta applied over the full range.
+- Positive `angle_delta` rotates counter-clockwise; negative rotates clockwise.
+- `angle_delta` can be larger than `360` (or less than `-360`) to perform extra full turns.
 - `orientation` is optional and defaults to `absolute`.
 - Allowed orientations:
    - `absolute`: use interpolated angle directly
