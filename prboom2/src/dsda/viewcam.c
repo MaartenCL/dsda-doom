@@ -169,13 +169,13 @@ static dboolean dsda_ParseAngleToken(const char *token, angle_t *out)
 
 static dsda_viewcam_orientation_t dsda_ParseOrientationToken(const char *token, dboolean allow_center)
 {
-  if (!strcasecmp(token, "absolute"))
+  if (!strcasecmp(token, "absolute") || !strcasecmp(token, "a"))
     return dsda_viewcam_orientation_absolute;
 
-  if (!strcasecmp(token, "movement"))
+  if (!strcasecmp(token, "movement") || !strcasecmp(token, "m"))
     return dsda_viewcam_orientation_movement;
 
-  if (allow_center && !strcasecmp(token, "center"))
+  if (allow_center && (!strcasecmp(token, "center") || !strcasecmp(token, "c")))
     return dsda_viewcam_orientation_center;
 
   return -1;
