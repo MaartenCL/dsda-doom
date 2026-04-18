@@ -4124,9 +4124,12 @@ void P_WalkTicker()
     fixed_t y;
     fixed_t z;
     angle_t angle;
+    dboolean cut_tic;
 
     if (dsda_EvaluateViewcamScript(dsda_DemoTic(), &x, &y, &z, &angle))
     {
+      cut_tic = dsda_ViewcamScriptCutsAtTic(dsda_DemoTic());
+
       walkcamera.type = 2;
       walkcamera.x = x;
       walkcamera.y = y;
@@ -4134,7 +4137,7 @@ void P_WalkTicker()
       walkcamera.angle = angle;
       walkcamera.pitch = 0;
 
-      if (!script_active_last_tic)
+      if (!script_active_last_tic || cut_tic)
       {
         walkcamera.PrevX = walkcamera.x;
         walkcamera.PrevY = walkcamera.y;

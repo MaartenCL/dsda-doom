@@ -641,21 +641,43 @@ dboolean dsda_HasViewcamScript(void)
   return dsda_viewcam_count > 0;
 }
 
-dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z, angle_t *angle)
+static int dsda_ViewcamInstructionIndex(int tic)
 {
-  const dsda_viewcam_instruction_t *instruction = NULL;
+  int index = -1;
   int i;
-  double t;
-  angle_t offset;
 
   for (i = 0; i < dsda_viewcam_count; ++i)
   {
     if (tic >= dsda_viewcam[i].first_tic && tic <= dsda_viewcam[i].last_tic)
-      instruction = &dsda_viewcam[i];
+      index = i;
   }
 
-  if (!instruction)
+  return index;
+}
+
+dboolean dsda_ViewcamScriptCutsAtTic(int tic)
+{
+  int current_index = dsda_ViewcamInstructionIndex(tic);
+
+  if (current_index < 0)
     return false;
+
+  return current_index != dsda_ViewcamInstructionIndex(tic - 1);
+}
+
+dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z, angle_t *angle)
+{
+  int instruction_index;
+  const dsda_viewcam_instruction_t *instruction;
+  double t;
+  angle_t offset;
+
+  instruction_index = dsda_ViewcamInstructionIndex(tic);
+
+  if (instruction_index < 0)
+    return false;
+
+  instruction = &dsda_viewcam[instruction_index];
 
   if (instruction->last_tic == instruction->first_tic)
     t = 0.0;

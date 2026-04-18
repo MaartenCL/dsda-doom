@@ -6,6 +6,7 @@ Use `-viewcam <path>` to load a scripted playback camera timeline.
 - Each non-empty, non-comment line defines one instruction.
 - Tic ranges are inclusive (`first_tic` through `last_tic`).
 - If ranges overlap, the last matching line in the file wins.
+- When the active instruction changes, the camera cuts on the tic boundary with no cross-instruction interpolation.
 - Outside scripted ranges, normal player view is used.
 - Pitch is always `0`.
 
@@ -31,6 +32,7 @@ Comments:
 Camera remains fixed between `first` and `last`.
 
 - Position stays fixed for the full range.
+- The shot is visible from the beginning of `first` through the end of `last`.
 - `angle_start` is the starting angle.
 - `angle_delta` is optional and defaults to `0`.
 - Positive `angle_delta` rotates counter-clockwise; negative rotates clockwise.

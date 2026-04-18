@@ -23,6 +23,7 @@
 void dsda_ClearViewcamScript(void);
 void dsda_LoadViewcamScript(const char *path);
 dboolean dsda_HasViewcamScript(void);
+dboolean dsda_ViewcamScriptCutsAtTic(int tic);
 dboolean dsda_EvaluateViewcamScript(int tic, fixed_t *x, fixed_t *y, fixed_t *z, angle_t *angle);
 
 #endif
