@@ -45,4 +45,10 @@ void TryRunTics (void);
 // CPhipps - move to header file
 void D_InitFakeNetGame (void); // This does the setup
 
+// Multiplayer-aware init: delegates to FakeNetGame or real net
+void D_InitNetGame(void);
+
+// Multiplayer-aware singletics handler (called from D_DoomLoop)
+void NetSingleTic(void);
+
 #endif

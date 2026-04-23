@@ -428,6 +428,13 @@ set(COMMON_SRC
 
 set(NET_CLIENT_SRC
     d_client.c
+    net_defs.h
+    net_transport.h
+    net_transport.c
+    net_serialize.h
+    net_serialize.c
+    net_session.h
+    net_session.c
 )
 
 if(HAVE_MMAP OR HAVE_CREATE_FILE_MAPPING)

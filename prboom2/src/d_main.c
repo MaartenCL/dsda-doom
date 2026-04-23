@@ -586,14 +586,7 @@ static void D_DoomLoop(void)
     // process one or more tics
     if (singletics)
     {
-      I_StartTic ();
-      G_BuildTiccmd (&local_cmds[consoleplayer][maketic%BACKUPTICS]);
-      if (advancedemo)
-        D_DoAdvanceDemo ();
-      M_Ticker ();
-      G_Ticker ();
-      gametic++;
-      maketic++;
+      NetSingleTic();
     }
     else
       TryRunTics (); // will run at least one tic
@@ -2037,7 +2030,7 @@ static void D_DoomMainSetup(void)
   if (autoload)
     D_AutoloadPWadDir();
 
-  D_InitFakeNetGame();
+  D_InitNetGame();
 
   //jff 9/3/98 use logical output routine
   lprintf(LO_DEBUG, "W_Init: Init WADfiles.\n");

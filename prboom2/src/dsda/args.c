@@ -198,6 +198,16 @@ static arg_config_t arg_config[dsda_arg_count] = {
     "play single player with coop thing spawns",
     arg_null,
   },
+  [dsda_arg_host] = {
+    "-host", NULL, NULL,
+    "host a 2-player coop game on the given port (default 26101)",
+    arg_string,
+  },
+  [dsda_arg_join] = {
+    "-join", NULL, NULL,
+    "join a 2-player coop game at the given address:port",
+    arg_string,
+  },
   [dsda_arg_pistol_start] = {
     "-pistolstart", "-wandstart", NULL,
     "automatically pistol start each map",

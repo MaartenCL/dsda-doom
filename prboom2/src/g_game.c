@@ -2821,9 +2821,12 @@ void G_ReloadDefaults(void)
   dsda_ClearPlaybackStream();
 
   // killough 2/21/98:
-  memset(playeringame + 1, 0, sizeof(*playeringame) * (MAX_MAXPLAYERS - 1));
+  // In multiplayer, preserve playeringame state for connected players
+  if (!netgame)
+    memset(playeringame + 1, 0, sizeof(*playeringame) * (MAX_MAXPLAYERS - 1));
 
-  consoleplayer = 0;
+  if (!netgame)
+    consoleplayer = 0;
 
   // MBF introduced configurable compatibility settings
   if (mbf_features)
