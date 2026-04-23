@@ -187,7 +187,16 @@ static int net_send_all(socket_t sock, const void *data, int length)
   int remaining = length;
 
   while (remaining > 0) {
-    int sent = send(sock, ptr, remaining, 0);
+    int sent;
+#ifdef _WIN32
+    sent = send(sock, ptr, remaining, 0);
+#else
+  #ifdef MSG_NOSIGNAL
+    sent = send(sock, ptr, remaining, MSG_NOSIGNAL);
+  #else
+    sent = send(sock, ptr, remaining, 0);
+  #endif
+#endif
     if (sent <= 0) {
       return -1;
     }

@@ -22,6 +22,7 @@
 
 #include "doomstat.h"
 #include "dsda/global.h"
+#include "dsda/demo.h"
 #include "i_main.h"
 #include "i_system.h"
 #include "lprintf.h"
@@ -218,6 +219,10 @@ void net_session_disconnect(void)
 {
   if (net_session.state == NET_STATE_DISCONNECTED)
     return;
+
+  // If recording, finalize the demo immediately so disconnect does not lose it.
+  if (demorecording)
+    dsda_EndDemoRecording();
 
   if (net_session.socket >= 0) {
     // Try to send QUIT (best effort, ignore errors)
