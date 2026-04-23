@@ -11,13 +11,32 @@
 //
 
 #include <string.h>
+#include <signal.h>
+#ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #include <winsock2.h>
+#else
+  #include <sys/select.h>
+  #include <sys/time.h>
+#endif
 
 #include "doomstat.h"
+#include "dsda/global.h"
+#include "i_main.h"
+#include "i_system.h"
 #include "lprintf.h"
 
 #include "net_transport.h"
 #include "net_serialize.h"
 #include "net_session.h"
+
+static volatile int net_interrupted = 0;
+
+static void net_sigint_handler(int sig)
+{
+  (void)sig;
+  net_interrupted = 1;
+}
 
 net_session_t net_session;
 
@@ -78,17 +97,36 @@ int net_session_host_start(int port)
     return -1;
   }
 
-  lprintf(LO_INFO, "Waiting for player to connect on port %d...\n", port);
+  lprintf(LO_INFO, "Waiting for player to connect on port %d... (press Ctrl-C to cancel)\n", port);
 
-  // Poll for client connection (blocking poll)
+  // Poll for client connection with a timeout so SIGINT can interrupt
+  net_interrupted = 0;
+  signal(SIGINT, net_sigint_handler);
+
   client_sock = -1;
   while (client_sock < 0) {
-    client_sock = net_accept(server_socket);
-    if (client_sock < 0) {
-      // Small sleep to avoid busy-waiting (platform-independent via I_uSleep)
-      // For now, just keep polling — the accept is non-blocking
+    fd_set readfds;
+    struct timeval tv;
+    int sel;
+
+    if (net_interrupted) {
+      lprintf(LO_INFO, "Interrupted, aborting host.\n");
+      signal(SIGINT, SIG_DFL);
+      net_close(server_socket);
+      server_socket = -1;
+      I_SafeExit(0);
     }
+
+    FD_ZERO(&readfds);
+    FD_SET(server_socket, &readfds);
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+    sel = select(server_socket + 1, &readfds, NULL, NULL, &tv);
+    if (sel > 0)
+      client_sock = net_accept(server_socket);
   }
+
+  signal(SIGINT, SIG_DFL);
 
   // Close the server socket — we only need the one client
   net_close(server_socket);
@@ -192,8 +230,10 @@ void net_session_disconnect(void)
     server_socket = -1;
   }
 
-  // Reset game state so the engine doesn't try to tick a missing player
-  playeringame[1] = false;
+  // Remove the remote player from the game; keep the local player active
+  if (net_session.remote_player >= 0 && net_session.remote_player < g_maxplayers)
+    playeringame[net_session.remote_player] = false;
+  // consoleplayer and playeringame[local] remain intact so play can continue
   netgame = false;
 
   net_session_reset();
