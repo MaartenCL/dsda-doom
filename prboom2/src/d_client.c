@@ -71,6 +71,7 @@
 ticcmd_t local_cmds[MAX_MAXPLAYERS][BACKUPTICS];
 int maketic;
 int solo_net = 0;
+static int remote_maketic;
 
 void D_InitFakeNetGame (void)
 {
@@ -165,6 +166,9 @@ void FakeNetUpdate(void)
   if (isExtraDDisplay)
     return;
 
+  if (net_session_active())
+    return;
+
   { // Build new ticcmds
     int newtics = dsda_GetTick() - lastmadetic;
     lastmadetic += newtics;
@@ -183,9 +187,6 @@ void FakeNetUpdate(void)
     }
   }
 }
-
-// Count of remote ticcmds received
-static int remote_maketic;
 
 // Build local ticcmd, send it to remote, receive remote's ticcmd.
 // For multiplayer: builds exactly one tic per call.
