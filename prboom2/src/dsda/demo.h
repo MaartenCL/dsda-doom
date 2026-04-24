@@ -28,6 +28,7 @@ dboolean dsda_StartDemoSegment(const char* demo_name);
 const byte* dsda_EvaluateDemoStartPoint(const byte* demo_p);
 void dsda_ExportDemo(const char* name);
 void dsda_MarkCompatibilityLevelUnspecified(void);
+void dsda_MarkCompatibilityLevelSpecified(void);
 int dsda_BytesPerTic(void);
 int dsda_DemoTic(void);
 void dsda_EvaluateBytesPerTic(void);

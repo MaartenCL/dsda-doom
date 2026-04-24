@@ -89,21 +89,25 @@ void D_InitFakeNetGame (void)
 
 void D_InitNetGame(void)
 {
-  dsda_arg_t *arg_host, *arg_join;
+  dsda_arg_t *arg_host, *arg_join, *arg_port;
+  int port;
 
   arg_host = dsda_Arg(dsda_arg_host);
   arg_join = dsda_Arg(dsda_arg_join);
+  arg_port = dsda_Arg(dsda_arg_port);
+  port = NET_DEFAULT_PORT;
+
+  if (arg_port->found)
+    port = arg_port->value.v_int;
 
   if (arg_host->found && arg_join->found) {
     I_Error("Cannot use -host and -join at the same time");
   }
 
   if (arg_host->found) {
-    int port = NET_DEFAULT_PORT;
-    if (arg_host->value.v_string)
-      port = atoi(arg_host->value.v_string);
-    if (port <= 0 || port > 65535)
-      port = NET_DEFAULT_PORT;
+    if (arg_host->value.v_int != 2) {
+      I_Error("Only 2-player multiplayer is currently supported (use -host 2)");
+    }
 
     if (net_session_host_start(port) != 0) {
       I_Error("Failed to start multiplayer host on port %d", port);
@@ -119,29 +123,17 @@ void D_InitNetGame(void)
   else if (arg_join->found) {
     const char *addr_str = arg_join->value.v_string;
     char address[256];
-    int port = NET_DEFAULT_PORT;
-    const char *colon;
 
     if (!addr_str || !addr_str[0]) {
-      I_Error("-join requires an address (e.g., 127.0.0.1 or 127.0.0.1:26101)");
+      I_Error("-join requires an address (e.g., 127.0.0.1)");
     }
 
-    // Parse address:port
-    colon = strrchr(addr_str, ':');
-    if (colon && colon != addr_str) {
-      int addr_len = (int)(colon - addr_str);
-      if (addr_len >= (int)sizeof(address))
-        addr_len = (int)sizeof(address) - 1;
-      memcpy(address, addr_str, addr_len);
-      address[addr_len] = '\0';
-      port = atoi(colon + 1);
-      if (port <= 0 || port > 65535)
-        port = NET_DEFAULT_PORT;
+    if (strchr(addr_str, ':')) {
+      I_Error("Use -port to set the network port (e.g., -join 127.0.0.1 -port 26101)");
     }
-    else {
-      strncpy(address, addr_str, sizeof(address) - 1);
-      address[sizeof(address) - 1] = '\0';
-    }
+
+    strncpy(address, addr_str, sizeof(address) - 1);
+    address[sizeof(address) - 1] = '\0';
 
     if (net_session_client_start(address, port) != 0) {
       I_Error("Failed to connect to %s:%d", address, port);

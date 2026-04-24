@@ -72,9 +72,9 @@ static void net_session_apply_setup(const net_setup_t *setup)
   startskill    = setup->skill;
   startepisode  = setup->episode;
   startmap      = setup->map;
-  // Note: compatibility_level is set via -complevel, not overwritten here
-  // to avoid breaking demo compatibility assumptions. The host should
-  // ensure both players use the same complevel.
+  // Apply host's compatibility level for multiplayer clients
+  compatibility_level = setup->complevel;
+  dsda_MarkCompatibilityLevelSpecified();
   deathmatch    = setup->deathmatch;
   nomonsters    = setup->nomonsters;
   fastparm      = setup->fast;

@@ -2769,7 +2769,7 @@ void G_ReloadDefaults(void)
     l = dsda_CompatibilityLevel();
     if (l != UNSPECIFIED_COMPLEVEL)
       compatibility_level = l;
-    else
+    else if (!netgame)  // Only mark unspecified if not in multiplayer (host provides it)
       dsda_MarkCompatibilityLevelUnspecified();
   }
   if (compatibility_level == -1)

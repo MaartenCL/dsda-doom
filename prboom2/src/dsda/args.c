@@ -200,13 +200,18 @@ static arg_config_t arg_config[dsda_arg_count] = {
   },
   [dsda_arg_host] = {
     "-host", NULL, NULL,
-    "host a 2-player coop game on the given port (default 26101)",
-    arg_string,
+    "host a multiplayer game with the given total player count (currently only 2)",
+    arg_int, 1, 2,
   },
   [dsda_arg_join] = {
     "-join", NULL, NULL,
-    "join a 2-player coop game at the given address:port",
+    "join a multiplayer game at the given address",
     arg_string,
+  },
+  [dsda_arg_port] = {
+    "-port", NULL, "26101",
+    "set the multiplayer TCP port",
+    arg_int, 1, 65535,
   },
   [dsda_arg_pistol_start] = {
     "-pistolstart", "-wandstart", NULL,

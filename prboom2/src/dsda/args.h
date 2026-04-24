@@ -151,6 +151,7 @@ typedef enum {
   dsda_arg_debug_mapinfo,
   dsda_arg_host,
   dsda_arg_join,
+  dsda_arg_port,
   dsda_arg_count,
 } dsda_arg_identifier_t;
 
