@@ -170,18 +170,39 @@ int net_session_client_start(const char *address, int port)
   int len;
   int sock;
   int msg_type;
+  int attempts;
 
   net_transport_init();
   net_session_reset();
 
-  lprintf(LO_INFO, "Connecting to %s:%d...\n", address, port);
+  lprintf(LO_INFO, "Connecting to %s:%d... (press Ctrl-C to cancel)\n", address, port);
 
-  sock = net_connect(address, port);
-  if (sock < 0) {
-    lprintf(LO_ERROR, "net_session_client_start: failed to connect to %s:%d\n",
-            address, port);
-    return -1;
+  // Retry until the host is available, or user interrupts with Ctrl-C.
+  net_interrupted = 0;
+  signal(SIGINT, net_sigint_handler);
+  attempts = 0;
+  sock = -1;
+
+  while (sock < 0) {
+    if (net_interrupted) {
+      lprintf(LO_INFO, "Interrupted, aborting join.\n");
+      signal(SIGINT, SIG_DFL);
+      I_SafeExit(0);
+    }
+
+    sock = net_connect(address, port);
+    if (sock >= 0)
+      break;
+
+    attempts++;
+    if (attempts == 1 || attempts % 5 == 0) {
+      lprintf(LO_INFO, "Still waiting for host at %s:%d...\n", address, port);
+    }
+
+    I_uSleep(1000000);
   }
+
+  signal(SIGINT, SIG_DFL);
 
   net_session.socket = sock;
   net_session.is_host = 0;
