@@ -44,9 +44,14 @@
 #include <sys/wait.h>
 #endif
 
+#include <string.h>
+
 #include "doomtype.h"
 #include "doomstat.h"
 #include "d_net.h"
+#include "m_random.h"
+#include "hu_stuff.h"
+#include "p_mobj.h"
 #include "z_zone.h"
 
 #include "d_main.h"
@@ -73,6 +78,255 @@ int maketic;
 int solo_net = 0;
 static int remote_maketic;
 
+static dboolean net_out_of_sync;
+static dboolean net_desync_diag;
+static unsigned int net_local_checksum_tic[BACKUPTICS];
+static unsigned int net_local_checksum_value[BACKUPTICS];
+static dboolean net_local_checksum_valid[BACKUPTICS];
+static unsigned int net_remote_checksum_tic[BACKUPTICS];
+static unsigned int net_remote_checksum_value[BACKUPTICS];
+static dboolean net_remote_checksum_valid[BACKUPTICS];
+
+typedef struct {
+  unsigned int tic;
+  unsigned int full;
+  unsigned int rng_full;
+  unsigned int rng_index;
+  unsigned int player0;
+  unsigned int player1;
+  unsigned int monsters;
+  unsigned int alive_monsters;
+  int p0_x;
+  int p0_y;
+  int p0_z;
+  int p0_health;
+  int p1_x;
+  int p1_y;
+  int p1_z;
+  int p1_health;
+  int rndindex;
+  int prndindex;
+  dboolean valid;
+} net_desync_diag_snapshot_t;
+
+static net_desync_diag_snapshot_t net_diag_local;
+static unsigned int net_diag_last_remote_tic;
+static unsigned int net_diag_last_remote_checksum;
+
+static void NetResetChecksumState(void)
+{
+  memset(net_local_checksum_valid, 0, sizeof(net_local_checksum_valid));
+  memset(net_remote_checksum_valid, 0, sizeof(net_remote_checksum_valid));
+  net_out_of_sync = false;
+  memset(&net_diag_local, 0, sizeof(net_diag_local));
+  net_diag_last_remote_tic = 0;
+  net_diag_last_remote_checksum = 0;
+}
+
+static unsigned int NetChecksumBytes(unsigned int hash, const void *data, size_t size)
+{
+  const unsigned char *p;
+  size_t i;
+
+  p = (const unsigned char *)data;
+
+  for (i = 0; i < size; i++) {
+    hash ^= p[i];
+    hash *= 16777619u;
+  }
+
+  return hash;
+}
+
+static unsigned int NetBuildChecksum(unsigned int tic)
+{
+  unsigned int hash;
+  int alive_monsters;
+  fixed_t p0_x, p0_y, p0_z;
+  fixed_t p1_x, p1_y, p1_z;
+  int p0_health, p1_health;
+  unsigned int rng_full_hash;
+  unsigned int rng_index_hash;
+  unsigned int player0_hash;
+  unsigned int player1_hash;
+  unsigned int monsters_hash;
+
+  hash = 2166136261u;
+
+  p0_x = p0_y = p0_z = 0;
+  p1_x = p1_y = p1_z = 0;
+
+  if (players[0].mo) {
+    p0_x = players[0].mo->x;
+    p0_y = players[0].mo->y;
+    p0_z = players[0].mo->z;
+  }
+
+  if (players[1].mo) {
+    p1_x = players[1].mo->x;
+    p1_y = players[1].mo->y;
+    p1_z = players[1].mo->z;
+  }
+
+  p0_health = players[0].health;
+  p1_health = players[1].health;
+
+  rng_full_hash = NetChecksumBytes(2166136261u, &rng, sizeof(rng));
+  rng_index_hash = NetChecksumBytes(2166136261u, &rng.rndindex, sizeof(rng.rndindex));
+
+  player0_hash = 2166136261u;
+  player0_hash = NetChecksumBytes(player0_hash, &p0_x, sizeof(p0_x));
+  player0_hash = NetChecksumBytes(player0_hash, &p0_y, sizeof(p0_y));
+  player0_hash = NetChecksumBytes(player0_hash, &p0_z, sizeof(p0_z));
+  player0_hash = NetChecksumBytes(player0_hash, &p0_health, sizeof(p0_health));
+
+  player1_hash = 2166136261u;
+  player1_hash = NetChecksumBytes(player1_hash, &p1_x, sizeof(p1_x));
+  player1_hash = NetChecksumBytes(player1_hash, &p1_y, sizeof(p1_y));
+  player1_hash = NetChecksumBytes(player1_hash, &p1_z, sizeof(p1_z));
+  player1_hash = NetChecksumBytes(player1_hash, &p1_health, sizeof(p1_health));
+
+  alive_monsters = P_CountLivingMonsters();
+  monsters_hash = NetChecksumBytes(2166136261u, &alive_monsters, sizeof(alive_monsters));
+
+  hash = NetChecksumBytes(hash, &rng.rndindex, sizeof(rng.rndindex));
+  hash = NetChecksumBytes(hash, &p0_x, sizeof(p0_x));
+  hash = NetChecksumBytes(hash, &p0_y, sizeof(p0_y));
+  hash = NetChecksumBytes(hash, &p0_z, sizeof(p0_z));
+  hash = NetChecksumBytes(hash, &p0_health, sizeof(p0_health));
+  hash = NetChecksumBytes(hash, &p1_x, sizeof(p1_x));
+  hash = NetChecksumBytes(hash, &p1_y, sizeof(p1_y));
+  hash = NetChecksumBytes(hash, &p1_z, sizeof(p1_z));
+  hash = NetChecksumBytes(hash, &p1_health, sizeof(p1_health));
+  hash = NetChecksumBytes(hash, &alive_monsters, sizeof(alive_monsters));
+
+  net_diag_local.tic = tic;
+  net_diag_local.full = hash;
+  net_diag_local.rng_full = rng_full_hash;
+  net_diag_local.rng_index = rng_index_hash;
+  net_diag_local.player0 = player0_hash;
+  net_diag_local.player1 = player1_hash;
+  net_diag_local.monsters = monsters_hash;
+  net_diag_local.alive_monsters = (unsigned int)alive_monsters;
+  net_diag_local.p0_x = (int)p0_x;
+  net_diag_local.p0_y = (int)p0_y;
+  net_diag_local.p0_z = (int)p0_z;
+  net_diag_local.p0_health = p0_health;
+  net_diag_local.p1_x = (int)p1_x;
+  net_diag_local.p1_y = (int)p1_y;
+  net_diag_local.p1_z = (int)p1_z;
+  net_diag_local.p1_health = p1_health;
+  net_diag_local.rndindex = rng.rndindex;
+  net_diag_local.prndindex = rng.prndindex;
+  net_diag_local.valid = true;
+
+  return hash;
+}
+
+static void NetCompareChecksumForTic(unsigned int tic)
+{
+  int idx;
+
+  idx = tic % BACKUPTICS;
+
+  if (!net_local_checksum_valid[idx] || !net_remote_checksum_valid[idx])
+    return;
+
+  if (net_local_checksum_tic[idx] != tic || net_remote_checksum_tic[idx] != tic)
+    return;
+
+  if (net_local_checksum_value[idx] != net_remote_checksum_value[idx]) {
+      lprintf(LO_ERROR, "Desync detected at tic %u (local=%08x remote=%08x)\n",
+        tic, net_local_checksum_value[idx], net_remote_checksum_value[idx]);
+
+      if (net_diag_local.valid && net_diag_local.tic == tic) {
+        lprintf(LO_ERROR,
+          "Desync diag local tic=%u full=%08x rng_full=%08x rng_index=%08x p0=%08x p1=%08x monsters=%08x alive=%u rnd=%d prnd=%d\n",
+          net_diag_local.tic,
+          net_diag_local.full,
+          net_diag_local.rng_full,
+          net_diag_local.rng_index,
+          net_diag_local.player0,
+          net_diag_local.player1,
+          net_diag_local.monsters,
+          net_diag_local.alive_monsters,
+          net_diag_local.rndindex,
+          net_diag_local.prndindex);
+
+        lprintf(LO_ERROR,
+          "Desync diag local p0_xyz=(%d,%d,%d) p0_health=%d p1_xyz=(%d,%d,%d) p1_health=%d\n",
+          net_diag_local.p0_x,
+          net_diag_local.p0_y,
+          net_diag_local.p0_z,
+          net_diag_local.p0_health,
+          net_diag_local.p1_x,
+          net_diag_local.p1_y,
+          net_diag_local.p1_z,
+          net_diag_local.p1_health);
+      }
+
+      lprintf(LO_ERROR, "Desync diag remote tic=%u full=%08x\n",
+        net_diag_last_remote_tic,
+        net_diag_last_remote_checksum);
+
+    net_out_of_sync = true;
+  }
+
+  net_local_checksum_valid[idx] = false;
+  net_remote_checksum_valid[idx] = false;
+}
+
+static void NetMaybeSendChecksum(void)
+{
+  unsigned int tic;
+  unsigned int checksum;
+  int idx;
+  unsigned char buf[NET_CHECKSUM_SIZE];
+  net_checksum_msg_t msg;
+
+  tic = (unsigned int)gametic;
+  if ((tic % TICRATE) != 0)
+    return;
+
+  checksum = NetBuildChecksum(tic);
+  idx = tic % BACKUPTICS;
+
+  net_local_checksum_tic[idx] = tic;
+  net_local_checksum_value[idx] = checksum;
+  net_local_checksum_valid[idx] = true;
+
+  msg.gametic = tic;
+  msg.checksum = checksum;
+  net_write_checksum(buf, &msg);
+
+  if (net_send_packet(net_session.socket, NET_MSG_CHECKSUM, buf, NET_CHECKSUM_SIZE) != 0) {
+    lprintf(LO_ERROR, "NetMaybeSendChecksum: failed to send checksum\n");
+    net_session_disconnect();
+    return;
+  }
+
+  if (net_desync_diag) {
+    lprintf(LO_INFO,
+            "Net checksum tic=%u local=%08x rng_full=%08x rng_index=%08x p0=%08x p1=%08x monsters=%08x alive=%u\n",
+            tic,
+            checksum,
+            net_diag_local.rng_full,
+            net_diag_local.rng_index,
+            net_diag_local.player0,
+            net_diag_local.player1,
+            net_diag_local.monsters,
+            net_diag_local.alive_monsters);
+  }
+
+  NetCompareChecksumForTic(tic);
+}
+
+static void NetUpdateOutOfSyncMessage(void)
+{
+  if (net_out_of_sync)
+    SetCustomMessage(displayplayer, "out of sync", 2 * TICRATE, 0);
+}
+
 void D_InitFakeNetGame (void)
 {
   int i;
@@ -92,9 +346,13 @@ void D_InitNetGame(void)
   dsda_arg_t *arg_host, *arg_join, *arg_port;
   int port;
 
+  NetResetChecksumState();
+  remote_maketic = 0;
+
   arg_host = dsda_Arg(dsda_arg_host);
   arg_join = dsda_Arg(dsda_arg_join);
   arg_port = dsda_Arg(dsda_arg_port);
+  net_desync_diag = dsda_Flag(dsda_arg_netdesyncdiag);
   port = NET_DEFAULT_PORT;
 
   if (arg_port->found)
@@ -226,6 +484,28 @@ static int NetRecvRemoteTic(void)
       net_read_ticcmd(buf, &local_cmds[remote][remote_maketic % BACKUPTICS]);
       remote_maketic++;
     }
+    else if (msg_type == NET_MSG_CHECKSUM) {
+      net_checksum_msg_t msg;
+      int idx;
+
+      if (len != NET_CHECKSUM_SIZE)
+        continue;
+
+      net_read_checksum(buf, &msg);
+      idx = msg.gametic % BACKUPTICS;
+      net_remote_checksum_tic[idx] = msg.gametic;
+      net_remote_checksum_value[idx] = msg.checksum;
+      net_remote_checksum_valid[idx] = true;
+      net_diag_last_remote_tic = msg.gametic;
+      net_diag_last_remote_checksum = msg.checksum;
+
+      if (net_desync_diag) {
+        lprintf(LO_INFO, "Net checksum recv tic=%u remote=%08x\n",
+                msg.gametic, msg.checksum);
+      }
+
+      NetCompareChecksumForTic(msg.gametic);
+    }
     else if (msg_type == NET_MSG_QUIT || msg_type < 0) {
       lprintf(LO_ERROR, "NetRecvRemoteTic: remote disconnected\n");
       net_session_disconnect();
@@ -262,7 +542,11 @@ void TryRunTics (void)
       D_DoAdvanceDemo();
     M_Ticker();
     G_Ticker();
+    NetMaybeSendChecksum();
+    if (!net_session_active())
+      return;
     gametic++;
+    NetUpdateOutOfSyncMessage();
     return;
   }
 
@@ -298,6 +582,7 @@ void TryRunTics (void)
     M_Ticker ();
     G_Ticker ();
     gametic++;
+    NetUpdateOutOfSyncMessage();
     FakeNetUpdate();
   }
 }
@@ -330,5 +615,9 @@ void NetSingleTic(void)
     D_DoAdvanceDemo();
   M_Ticker();
   G_Ticker();
+  NetMaybeSendChecksum();
+  if (!net_session_active())
+    return;
   gametic++;
+  NetUpdateOutOfSyncMessage();
 }

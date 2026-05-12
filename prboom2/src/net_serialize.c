@@ -104,3 +104,17 @@ int net_read_setup(const unsigned char *buf, net_setup_t *setup)
   setup->longtics   = read_i32(&buf[32]);
   return NET_SETUP_SIZE;
 }
+
+int net_write_checksum(unsigned char *buf, const net_checksum_msg_t *msg)
+{
+  write_i32(&buf[0], (int)msg->gametic);
+  write_i32(&buf[4], (int)msg->checksum);
+  return NET_CHECKSUM_SIZE;
+}
+
+int net_read_checksum(const unsigned char *buf, net_checksum_msg_t *msg)
+{
+  msg->gametic = (unsigned int)read_i32(&buf[0]);
+  msg->checksum = (unsigned int)read_i32(&buf[4]);
+  return NET_CHECKSUM_SIZE;
+}

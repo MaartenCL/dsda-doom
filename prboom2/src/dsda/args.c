@@ -213,6 +213,11 @@ static arg_config_t arg_config[dsda_arg_count] = {
     "set the multiplayer TCP port",
     arg_int, 1, 65535,
   },
+  [dsda_arg_netdesyncdiag] = {
+    "-netdesyncdiag", NULL, NULL,
+    "enable verbose multiplayer desync diagnostics",
+    arg_null,
+  },
   [dsda_arg_pistol_start] = {
     "-pistolstart", "-wandstart", NULL,
     "automatically pistol start each map",
