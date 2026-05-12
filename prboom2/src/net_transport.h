@@ -29,6 +29,9 @@ int net_accept(int server_socket);
 // Client: connect to host:port, returns socket or -1
 int net_connect(const char *address, int port);
 
+// Set network latency simulation (avg_ms = 0 disables)
+void net_set_latency(int avg_ms, int jitter_ms);
+
 // Send a complete message: [u16 type][u16 length][payload]
 // Returns 0 on success, -1 on error
 int net_send_packet(int socket, int type, const void *data, int length);

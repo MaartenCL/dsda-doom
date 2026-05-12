@@ -89,16 +89,32 @@ void D_InitFakeNetGame (void)
 
 void D_InitNetGame(void)
 {
-  dsda_arg_t *arg_host, *arg_join, *arg_port;
+  dsda_arg_t *arg_host, *arg_join, *arg_port, *arg_latency;
   int port;
 
   arg_host = dsda_Arg(dsda_arg_host);
   arg_join = dsda_Arg(dsda_arg_join);
   arg_port = dsda_Arg(dsda_arg_port);
+  arg_latency = dsda_Arg(dsda_arg_netlatency);
   port = NET_DEFAULT_PORT;
 
   if (arg_port->found)
     port = arg_port->value.v_int;
+
+  // Initialize network latency simulation if requested
+  if (arg_latency->found) {
+    int latency_avg = 138;  // Default: US East Coast ping
+    int latency_jitter = 45; // Default: reasonable jitter range
+    
+    if (arg_latency->count >= 1)
+      latency_avg = arg_latency->value.v_int_array[0];
+    if (arg_latency->count >= 2)
+      latency_jitter = arg_latency->value.v_int_array[1];
+    
+    net_set_latency(latency_avg, latency_jitter);
+    lprintf(LO_INFO, "Network latency simulation enabled: %d ms +/- %d ms\n",
+            latency_avg, latency_jitter);
+  }
 
   if (arg_host->found && arg_join->found) {
     I_Error("Cannot use -host and -join at the same time");

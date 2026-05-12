@@ -213,6 +213,11 @@ static arg_config_t arg_config[dsda_arg_count] = {
     "set the multiplayer TCP port",
     arg_int, 1, 65535,
   },
+  [dsda_arg_netlatency] = {
+    "-netlatency", NULL, NULL,
+    "simulate network latency with optional average (ms) and jitter range (ms)",
+    arg_int_array, 0, 10000, 0, 2,
+  },
   [dsda_arg_pistol_start] = {
     "-pistolstart", "-wandstart", NULL,
     "automatically pistol start each map",

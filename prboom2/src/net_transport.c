@@ -40,9 +40,50 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 #include "lprintf.h"
 #include "net_transport.h"
+
+// Network latency simulation for testing
+static int net_latency_avg = 0;   // Average latency in ms (0 = disabled)
+static int net_latency_jitter = 0; // Jitter range in ms
+
+static double net_rand_unit(void)
+{
+  return rand() / (double)RAND_MAX;
+}
+
+// Simulate latency with jitter using a bell curve
+static void net_apply_latency(void)
+{
+  int latency_ms;
+  double noise;
+  double jitter_half;
+  double result;
+  
+  if (net_latency_avg <= 0)
+    return;  // Latency disabled
+  
+  // Create bell curve by averaging 3 random samples
+  noise = (net_rand_unit() + net_rand_unit() + net_rand_unit()) / 3.0;
+  
+  // Scale jitter and center around average
+  jitter_half = net_latency_jitter / 2.0;
+  result = net_latency_avg - jitter_half + (noise * net_latency_jitter);
+  
+  // Clamp to minimum of 1ms
+  latency_ms = (int)result;
+  if (latency_ms < 1)
+    latency_ms = 1;
+  
+#ifdef _WIN32
+  Sleep((DWORD)latency_ms);
+#else
+  usleep(latency_ms * 1000);
+#endif
+}
 
 void net_transport_init(void)
 {
@@ -267,6 +308,9 @@ int net_recv_packet(int socket, void *data, int *length, int max_length)
       return -1;
   }
 
+  // Apply simulated latency after receiving the packet
+  net_apply_latency();
+
   if (length)
     *length = payload_len;
 
@@ -291,4 +335,13 @@ void net_set_timeout(int socket, int milliseconds)
   tv.tv_usec = (milliseconds % 1000) * 1000;
   setsockopt((socket_t)socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 #endif
+}
+void net_set_latency(int avg_ms, int jitter_ms)
+{
+  net_latency_avg = (avg_ms > 0) ? avg_ms : 0;
+  net_latency_jitter = (jitter_ms > 0) ? jitter_ms : 0;
+  
+  // Seed the random number generator if latency is enabled
+  if (net_latency_avg > 0)
+    srand((unsigned int)time(NULL));
 }
