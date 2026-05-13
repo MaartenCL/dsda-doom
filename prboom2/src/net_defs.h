@@ -18,12 +18,14 @@
 
 #define NET_DEFAULT_PORT 26101
 #define NET_TICCMD_SIZE  12
+#define NET_CHECKSUM_SIZE 8
 
 // Wire protocol message types
 typedef enum {
   NET_MSG_SETUP,    // host -> client: game settings
   NET_MSG_READY,    // client -> host: ready to play
   NET_MSG_TICCMD,   // bidirectional: one tic of input
+  NET_MSG_CHECKSUM, // bidirectional: periodic desync checksum
   NET_MSG_ADVANCE,  // bidirectional: frame advance request (build mode)
   NET_MSG_QUIT,     // bidirectional: graceful disconnect
 } net_msg_type_t;
@@ -49,6 +51,12 @@ typedef struct {
   unsigned int gametic;
   ticcmd_t cmd;
 } net_ticcmd_msg_t;
+
+// Periodic desync checksum message
+typedef struct {
+  unsigned int gametic;
+  unsigned int checksum;
+} net_checksum_msg_t;
 
 // Session state
 typedef enum {

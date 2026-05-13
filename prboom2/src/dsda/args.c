@@ -218,6 +218,11 @@ static arg_config_t arg_config[dsda_arg_count] = {
     "simulate network latency with optional average (ms) and jitter range (ms)",
     arg_int_array, 0, 10000, 0, 2,
   },
+  [dsda_arg_netdesyncdiag] = {
+    "-netdesyncdiag", NULL, NULL,
+    "enable verbose multiplayer desync diagnostics",
+    arg_null,
+  },
   [dsda_arg_pistol_start] = {
     "-pistolstart", "-wandstart", NULL,
     "automatically pistol start each map",

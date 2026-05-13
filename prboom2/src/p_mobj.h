@@ -457,6 +457,7 @@ dboolean P_CheckMissileSpawn(mobj_t*);  // killough 8/2/98
 void    P_ExplodeMissile(mobj_t*);    // killough
 
 void P_RemoveMonsters(void);
+int P_CountLivingMonsters(void);
 
 // heretic
 

@@ -1963,6 +1963,31 @@ void P_RemoveMonsters(void)
   P_CleanThinkers();
 }
 
+int P_CountLivingMonsters(void)
+{
+  thinker_t *th;
+  int count;
+
+  count = 0;
+
+  for (th = thinkercap.next; th != &thinkercap; th = th->next)
+  {
+    mobj_t *mobj;
+
+    if (th->function != P_MobjThinker)
+      continue;
+
+    mobj = (mobj_t *)th;
+    if (mobj->player)
+      continue;
+
+    if (ALIVE(mobj))
+      count++;
+  }
+
+  return count;
+}
+
 //
 // P_RespawnSpecials
 //
