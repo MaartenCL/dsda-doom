@@ -42,16 +42,24 @@
 #include <stdio.h>
 
 #include "lprintf.h"
+#include "i_system.h"
 #include "net_transport.h"
 
 void net_transport_init(void)
 {
+  static int initialized = 0;
+  if (initialized)
+    return;
+  initialized = 1;
+
 #ifdef _WIN32
   WSADATA wsa_data;
   if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0) {
     lprintf(LO_ERROR, "net_transport_init: WSAStartup failed\n");
   }
 #endif
+
+  I_AtExit(net_transport_shutdown, true, "net_transport_shutdown", exit_priority_normal);
 }
 
 void net_transport_shutdown(void)
@@ -143,34 +151,33 @@ int net_accept(int server_socket)
 int net_connect(const char *address, int port)
 {
   socket_t sock;
-  struct sockaddr_in addr;
-  struct hostent *host;
+  struct addrinfo hints, *res, *rp;
+  char port_str[16];
 
-  sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (sock == SOCKET_INVALID) {
-    lprintf(LO_ERROR, "net_connect: socket() failed\n");
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family   = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  snprintf(port_str, sizeof(port_str), "%d", port);
+
+  if (getaddrinfo(address, port_str, &hints, &res) != 0) {
+    lprintf(LO_ERROR, "net_connect: cannot resolve '%s'\n", address);
     return -1;
   }
 
-  memset(&addr, 0, sizeof(addr));
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons((unsigned short)port);
-
-  // Try numeric address first
-  addr.sin_addr.s_addr = inet_addr(address);
-  if (addr.sin_addr.s_addr == INADDR_NONE) {
-    host = gethostbyname(address);
-    if (!host) {
-      lprintf(LO_ERROR, "net_connect: cannot resolve '%s'\n", address);
-      NET_CLOSESOCKET(sock);
-      return -1;
-    }
-    memcpy(&addr.sin_addr, host->h_addr_list[0], host->h_length);
-  }
-
-  if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR_VAL) {
-    lprintf(LO_ERROR, "net_connect: connect() to %s:%d failed\n", address, port);
+  sock = SOCKET_INVALID;
+  for (rp = res; rp != NULL; rp = rp->ai_next) {
+    sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (sock == SOCKET_INVALID)
+      continue;
+    if (connect(sock, rp->ai_addr, (int)rp->ai_addrlen) != SOCKET_ERROR_VAL)
+      break;  // connected
     NET_CLOSESOCKET(sock);
+    sock = SOCKET_INVALID;
+  }
+  freeaddrinfo(res);
+
+  if (sock == SOCKET_INVALID) {
+    lprintf(LO_ERROR, "net_connect: connect() to %s:%d failed\n", address, port);
     return -1;
   }
 
@@ -178,6 +185,20 @@ int net_connect(const char *address, int port)
 
   lprintf(LO_INFO, "net_connect: connected to %s:%d\n", address, port);
   return (int)sock;
+}
+
+// Drain and discard 'count' bytes from the socket to re-sync the TCP stream
+// after a payload-too-large error, so the next header read sees valid data.
+static void net_drain_bytes(socket_t sock, int count)
+{
+  unsigned char discard[256];
+  while (count > 0) {
+    int want = count < (int)sizeof(discard) ? count : (int)sizeof(discard);
+    int got = recv(sock, (char *)discard, want, 0);
+    if (got <= 0)
+      break;
+    count -= got;
+  }
 }
 
 // Send exactly 'length' bytes. Returns 0 on success, -1 on error.
@@ -257,8 +278,9 @@ int net_recv_packet(int socket, void *data, int *length, int max_length)
   payload_len = (header[2] << 8) | header[3];
 
   if (payload_len > max_length) {
-    lprintf(LO_ERROR, "net_recv_packet: payload too large (%d > %d)\n",
+    lprintf(LO_ERROR, "net_recv_packet: payload too large (%d > %d), draining\n",
             payload_len, max_length);
+    net_drain_bytes((socket_t)socket, payload_len);
     return -1;
   }
 
@@ -271,6 +293,20 @@ int net_recv_packet(int socket, void *data, int *length, int max_length)
     *length = payload_len;
 
   return type;
+}
+
+// Like net_recv_packet but gates the initial read with a select() timeout.
+// Returns the message type on success, -1 on connection error/disconnect,
+// or NET_RECV_TIMEOUT (-2) if no data arrives within timeout_ms.
+int net_recv_packet_timeout(int socket, void *data, int *length, int max_length,
+                            int timeout_ms)
+{
+  int wait_result = net_wait_for_packet(socket, timeout_ms);
+  if (wait_result == 0)
+    return NET_RECV_TIMEOUT;
+  if (wait_result < 0)
+    return -1;
+  return net_recv_packet(socket, data, length, max_length);
 }
 
 int net_wait_for_packet(int socket, int timeout_ms)

@@ -129,6 +129,14 @@ static void NetResetChecksumState(void)
   net_diag_last_remote_checksum = 0;
 }
 
+// Purge all per-session multiplayer state. Called on game init and on every
+// disconnect so that a reconnect (or future rewind) starts with a clean slate.
+void NetResetState(void)
+{
+  remote_maketic = 0;
+  NetResetChecksumState();
+}
+
 static unsigned int NetChecksumBytes(unsigned int hash, const void *data, size_t size)
 {
   const unsigned char *p;
@@ -177,7 +185,13 @@ static unsigned int NetBuildChecksum(unsigned int tic)
   p0_health = players[0].health;
   p1_health = players[1].health;
 
-  rng_full_hash = NetChecksumBytes(2166136261u, &rng, sizeof(rng));
+  // Hash each field of rng_t explicitly rather than taking &rng directly.
+  // A raw sizeof(rng) hash would include any compiler-inserted padding bytes
+  // whose values are undefined, producing false desync alerts between builds.
+  rng_full_hash = 2166136261u;
+  rng_full_hash = NetChecksumBytes(rng_full_hash, rng.seed, sizeof(rng.seed));
+  rng_full_hash = NetChecksumBytes(rng_full_hash, &rng.rndindex, sizeof(rng.rndindex));
+  rng_full_hash = NetChecksumBytes(rng_full_hash, &rng.prndindex, sizeof(rng.prndindex));
   rng_index_hash = NetChecksumBytes(2166136261u, &rng.rndindex, sizeof(rng.rndindex));
 
   player0_hash = 2166136261u;
@@ -358,8 +372,7 @@ void D_InitNetGame(void)
   dsda_arg_t *arg_host, *arg_join, *arg_port;
   int port;
 
-  NetResetChecksumState();
-  remote_maketic = 0;
+  NetResetState();
 
   arg_host = dsda_Arg(dsda_arg_host);
   arg_join = dsda_Arg(dsda_arg_join);
@@ -554,6 +567,51 @@ static int NetRecvRemoteTic(void)
   return 0;
 }
 
+// Unified multiplayer tic-advance protocol. Encapsulates the entire lockstep
+// sequence: poll input, send local ticcmd, receive remote ticcmd, advance the
+// world. This is the single intercept point for future Rewind/Rollback hooks.
+//
+// Returns:
+//   1  — tic advanced successfully (gametic incremented)
+//   0  — still waiting for remote peer (caller should yield)
+//  -1  — disconnected (session torn down, caller should bail)
+static int NetRunOneTic(void)
+{
+  I_StartTic();
+
+  // Build local ticcmd and send to remote
+  NetUpdate();
+  if (!net_session_active())
+    return -1;
+
+  // Wait for remote ticcmd
+  {
+    int recv_result = NetRecvRemoteTic();
+
+    if (recv_result == 1) {
+      // No remote data yet — tick menus/UI so the game stays responsive
+      M_Ticker();
+      NetUpdateOutOfSyncMessage();
+      return 0;
+    }
+
+    if (recv_result != 0)
+      return -1;
+  }
+
+  // Both players have ticcmds for gametic — advance one tic
+  if (advancedemo)
+    D_DoAdvanceDemo();
+  M_Ticker();
+  G_Ticker();
+  NetMaybeSendChecksum();
+  if (!net_session_active())
+    return -1;
+  gametic++;
+  NetUpdateOutOfSyncMessage();
+  return 1;
+}
+
 // Implicitly tracked whenever we check the current tick
 int ms_to_next_tick;
 
@@ -563,39 +621,7 @@ void TryRunTics (void)
   int entertime = dsda_GetTick();
 
   if (net_session_active()) {
-    I_StartTic();
-
-    // Multiplayer lockstep: build and send one local tic, then
-    // block until we have the remote player's tic, then advance.
-    NetUpdate();
-
-    if (!net_session_active())
-      return;  // disconnected during send
-
-    // Hard stall: wait for remote ticcmd
-    {
-      int recv_result = NetRecvRemoteTic();
-
-      if (recv_result == 1) {
-        M_Ticker();
-        NetUpdateOutOfSyncMessage();
-        return;  // still waiting for remote tic
-      }
-
-      if (recv_result != 0)
-        return;  // disconnected
-    }
-
-    // Both players have ticcmds for gametic — run one tic
-    if (advancedemo)
-      D_DoAdvanceDemo();
-    M_Ticker();
-    G_Ticker();
-    NetMaybeSendChecksum();
-    if (!net_session_active())
-      return;
-    gametic++;
-    NetUpdateOutOfSyncMessage();
+    NetRunOneTic();
     return;
   }
 
@@ -653,32 +679,6 @@ void NetSingleTic(void)
     return;
   }
 
-  // Multiplayer singletics: same lockstep as TryRunTics
-  I_StartTic();
-  NetUpdate();
-  if (!net_session_active())
-    return;
-
-  {
-    int recv_result = NetRecvRemoteTic();
-
-    if (recv_result == 1) {
-      M_Ticker();
-      NetUpdateOutOfSyncMessage();
-      return;
-    }
-
-    if (recv_result != 0)
-      return;
-  }
-
-  if (advancedemo)
-    D_DoAdvanceDemo();
-  M_Ticker();
-  G_Ticker();
-  NetMaybeSendChecksum();
-  if (!net_session_active())
-    return;
-  gametic++;
-  NetUpdateOutOfSyncMessage();
+  // Multiplayer singletics: unified lockstep
+  NetRunOneTic();
 }

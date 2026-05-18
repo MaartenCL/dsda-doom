@@ -16,6 +16,9 @@
 #include "doomtype.h"
 #include "net_defs.h"
 
+// Return value from net_recv_packet_timeout when the select() deadline expires.
+#define NET_RECV_TIMEOUT (-2)
+
 // Initialize / shutdown platform socket library
 void net_transport_init(void);
 void net_transport_shutdown(void);
@@ -36,6 +39,11 @@ int net_send_packet(int socket, int type, const void *data, int length);
 // Receive a complete message (blocks until available or timeout)
 // Returns message type, fills data and length. Returns -1 on error/disconnect.
 int net_recv_packet(int socket, void *data, int *length, int max_length);
+
+// Like net_recv_packet but returns NET_RECV_TIMEOUT (-2) if no data arrives
+// within timeout_ms milliseconds instead of blocking indefinitely.
+int net_recv_packet_timeout(int socket, void *data, int *length, int max_length,
+                            int timeout_ms);
 
 // Wait for the socket to become readable.
 // Returns 1 if data is ready, 0 on timeout, -1 on error.
