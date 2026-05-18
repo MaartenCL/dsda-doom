@@ -80,6 +80,7 @@ static int remote_maketic;
 
 static dboolean net_out_of_sync;
 static dboolean net_desync_diag;
+static dboolean net_waiting_for_peer;
 static unsigned int net_local_checksum_tic[BACKUPTICS];
 static unsigned int net_local_checksum_value[BACKUPTICS];
 static dboolean net_local_checksum_valid[BACKUPTICS];
@@ -118,6 +119,7 @@ static void NetResetChecksumState(void)
   memset(net_local_checksum_valid, 0, sizeof(net_local_checksum_valid));
   memset(net_remote_checksum_valid, 0, sizeof(net_remote_checksum_valid));
   net_out_of_sync = false;
+  net_waiting_for_peer = false;
   memset(&net_diag_local, 0, sizeof(net_diag_local));
   net_diag_last_remote_tic = 0;
   net_diag_last_remote_checksum = 0;
@@ -323,7 +325,9 @@ static void NetMaybeSendChecksum(void)
 
 static void NetUpdateOutOfSyncMessage(void)
 {
-  if (net_out_of_sync)
+  if (net_waiting_for_peer)
+    SetCustomMessage(displayplayer, "waiting for peer", 2 * TICRATE, 0);
+  else if (net_out_of_sync)
     SetCustomMessage(displayplayer, "out of sync", 2 * TICRATE, 0);
 }
 
@@ -494,11 +498,30 @@ static int NetRecvRemoteTic(void)
   int remote = net_session.remote_player;
 
   while (remote_maketic <= gametic) {
+    int wait_result = net_wait_for_packet(net_session.socket, 1000);
+
+    if (wait_result == 0) {
+      if (!net_waiting_for_peer) {
+        lprintf(LO_INFO, "NetRecvRemoteTic: waiting for remote tic %d\n", gametic);
+      }
+
+      net_waiting_for_peer = true;
+      NetUpdateOutOfSyncMessage();
+      return 1;
+    }
+
+    if (wait_result < 0) {
+      lprintf(LO_ERROR, "NetRecvRemoteTic: socket wait failed\n");
+      net_session_disconnect();
+      return -1;
+    }
+
     msg_type = net_recv_packet(net_session.socket, buf, &len, sizeof(buf));
 
     if (msg_type == NET_MSG_TICCMD) {
       net_read_ticcmd(buf, &local_cmds[remote][remote_maketic % BACKUPTICS]);
       remote_maketic++;
+      net_waiting_for_peer = false;
     }
     else if (msg_type == NET_MSG_CHECKSUM) {
       net_checksum_msg_t msg;
@@ -550,8 +573,12 @@ void TryRunTics (void)
       return;  // disconnected during send
 
     // Hard stall: wait for remote ticcmd
-    if (NetRecvRemoteTic() != 0)
-      return;  // disconnected
+    {
+      int recv_result = NetRecvRemoteTic();
+
+      if (recv_result != 0)
+        return;  // disconnected or still waiting for remote tic
+    }
 
     // Both players have ticcmds for gametic — run one tic
     if (advancedemo)
@@ -624,8 +651,12 @@ void NetSingleTic(void)
   if (!net_session_active())
     return;
 
-  if (NetRecvRemoteTic() != 0)
-    return;
+  {
+    int recv_result = NetRecvRemoteTic();
+
+    if (recv_result != 0)
+      return;
+  }
 
   if (advancedemo)
     D_DoAdvanceDemo();
