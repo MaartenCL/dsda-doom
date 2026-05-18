@@ -273,6 +273,31 @@ int net_recv_packet(int socket, void *data, int *length, int max_length)
   return type;
 }
 
+int net_wait_for_packet(int socket, int timeout_ms)
+{
+  fd_set readfds;
+  struct timeval tv;
+  int result;
+
+  if (socket < 0)
+    return -1;
+
+  FD_ZERO(&readfds);
+  FD_SET((socket_t)socket, &readfds);
+
+  tv.tv_sec = timeout_ms / 1000;
+  tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+  result = select(socket + 1, &readfds, NULL, NULL, &tv);
+  if (result > 0)
+    return 1;
+
+  if (result == 0)
+    return 0;
+
+  return -1;
+}
+
 void net_close(int socket)
 {
   if (socket >= 0) {

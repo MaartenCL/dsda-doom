@@ -37,6 +37,10 @@ int net_send_packet(int socket, int type, const void *data, int length);
 // Returns message type, fills data and length. Returns -1 on error/disconnect.
 int net_recv_packet(int socket, void *data, int *length, int max_length);
 
+// Wait for the socket to become readable.
+// Returns 1 if data is ready, 0 on timeout, -1 on error.
+int net_wait_for_packet(int socket, int timeout_ms);
+
 // Close a socket
 void net_close(int socket);
 
