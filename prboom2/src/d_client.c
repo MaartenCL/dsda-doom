@@ -81,6 +81,9 @@ static int remote_maketic;
 static dboolean net_out_of_sync;
 static dboolean net_desync_diag;
 static dboolean net_waiting_for_peer;
+static dboolean net_connection_lost;
+#define NET_WAIT_INITIAL_TIMEOUT_MS 1000
+#define NET_WAIT_POLL_TIMEOUT_MS 50
 static unsigned int net_local_checksum_tic[BACKUPTICS];
 static unsigned int net_local_checksum_value[BACKUPTICS];
 static dboolean net_local_checksum_valid[BACKUPTICS];
@@ -120,6 +123,7 @@ static void NetResetChecksumState(void)
   memset(net_remote_checksum_valid, 0, sizeof(net_remote_checksum_valid));
   net_out_of_sync = false;
   net_waiting_for_peer = false;
+  net_connection_lost = false;
   memset(&net_diag_local, 0, sizeof(net_diag_local));
   net_diag_last_remote_tic = 0;
   net_diag_last_remote_checksum = 0;
@@ -303,6 +307,8 @@ static void NetMaybeSendChecksum(void)
 
   if (net_send_packet(net_session.socket, NET_MSG_CHECKSUM, buf, NET_CHECKSUM_SIZE) != 0) {
     lprintf(LO_ERROR, "NetMaybeSendChecksum: failed to send checksum\n");
+    net_waiting_for_peer = false;
+    net_connection_lost = true;
     net_session_disconnect();
     return;
   }
@@ -325,7 +331,9 @@ static void NetMaybeSendChecksum(void)
 
 static void NetUpdateOutOfSyncMessage(void)
 {
-  if (net_waiting_for_peer)
+  if (net_connection_lost)
+    SetCustomMessage(displayplayer, "connection lost", 2 * TICRATE, 0);
+  else if (net_waiting_for_peer)
     SetCustomMessage(displayplayer, "waiting for peer", 2 * TICRATE, 0);
   else if (net_out_of_sync)
     SetCustomMessage(displayplayer, "out of sync", 2 * TICRATE, 0);
@@ -456,7 +464,6 @@ static void NetUpdate(void)
   if (maketic > gametic)
     return;
 
-  I_StartTic();
 
   // Build local ticcmd
   G_BuildTiccmd(&local_cmds[local][maketic % BACKUPTICS]);
@@ -465,6 +472,8 @@ static void NetUpdate(void)
   net_write_ticcmd(buf, &local_cmds[local][maketic % BACKUPTICS]);
   if (net_send_packet(net_session.socket, NET_MSG_TICCMD, buf, NET_TICCMD_SIZE) != 0) {
     lprintf(LO_ERROR, "NetUpdate: failed to send ticcmd\n");
+    net_waiting_for_peer = false;
+    net_connection_lost = true;
     net_session_disconnect();
     return;
   }
@@ -482,7 +491,8 @@ static int NetRecvRemoteTic(void)
   int remote = net_session.remote_player;
 
   while (remote_maketic <= gametic) {
-    int wait_result = net_wait_for_packet(net_session.socket, 1000);
+    int timeout_ms = net_waiting_for_peer ? NET_WAIT_POLL_TIMEOUT_MS : NET_WAIT_INITIAL_TIMEOUT_MS;
+    int wait_result = net_wait_for_packet(net_session.socket, timeout_ms);
 
     if (wait_result == 0) {
       if (!net_waiting_for_peer) {
@@ -496,6 +506,8 @@ static int NetRecvRemoteTic(void)
 
     if (wait_result < 0) {
       lprintf(LO_ERROR, "NetRecvRemoteTic: socket wait failed\n");
+      net_waiting_for_peer = false;
+      net_connection_lost = true;
       net_session_disconnect();
       return -1;
     }
@@ -531,6 +543,8 @@ static int NetRecvRemoteTic(void)
     }
     else if (msg_type == NET_MSG_QUIT || msg_type < 0) {
       lprintf(LO_ERROR, "NetRecvRemoteTic: remote disconnected\n");
+      net_waiting_for_peer = false;
+      net_connection_lost = true;
       net_session_disconnect();
       return -1;
     }
@@ -549,6 +563,8 @@ void TryRunTics (void)
   int entertime = dsda_GetTick();
 
   if (net_session_active()) {
+    I_StartTic();
+
     // Multiplayer lockstep: build and send one local tic, then
     // block until we have the remote player's tic, then advance.
     NetUpdate();
@@ -560,8 +576,14 @@ void TryRunTics (void)
     {
       int recv_result = NetRecvRemoteTic();
 
+      if (recv_result == 1) {
+        M_Ticker();
+        NetUpdateOutOfSyncMessage();
+        return;  // still waiting for remote tic
+      }
+
       if (recv_result != 0)
-        return;  // disconnected or still waiting for remote tic
+        return;  // disconnected
     }
 
     // Both players have ticcmds for gametic — run one tic
@@ -627,16 +649,24 @@ void NetSingleTic(void)
     G_Ticker();
     gametic++;
     maketic++;
+    NetUpdateOutOfSyncMessage();
     return;
   }
 
   // Multiplayer singletics: same lockstep as TryRunTics
+  I_StartTic();
   NetUpdate();
   if (!net_session_active())
     return;
 
   {
     int recv_result = NetRecvRemoteTic();
+
+    if (recv_result == 1) {
+      M_Ticker();
+      NetUpdateOutOfSyncMessage();
+      return;
+    }
 
     if (recv_result != 0)
       return;
