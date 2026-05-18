@@ -27,11 +27,30 @@
 #include "i_system.h"
 #include "lprintf.h"
 
+#include "d_net.h"
 #include "net_transport.h"
 #include "net_serialize.h"
 #include "net_session.h"
 
 static volatile int net_interrupted = 0;
+
+// Timeout for individual handshake recv calls (ms). Long enough for any
+// reasonable WAN connection; short enough that a stalled peer can't freeze
+// the process indefinitely.
+#define NET_HANDSHAKE_TIMEOUT_MS 30000
+
+// Guard so we register the disconnect atexit handler only once, even if
+// net_session_host_start / net_session_client_start are called multiple times.
+static int net_disconnect_atexit_registered = 0;
+
+static void net_session_register_disconnect_atexit(void)
+{
+  if (!net_disconnect_atexit_registered) {
+    I_AtExit(net_session_disconnect, true, "net_session_disconnect",
+             exit_priority_first);
+    net_disconnect_atexit_registered = 1;
+  }
+}
 
 static void net_sigint_handler(int sig)
 {
@@ -88,6 +107,7 @@ int net_session_host_start(int port)
   int len;
   int client_sock;
   int msg_type;
+  void (*prev_sigint)(int);
 
   net_transport_init();
   net_session_reset();
@@ -100,9 +120,12 @@ int net_session_host_start(int port)
 
   lprintf(LO_INFO, "Waiting for player to connect on port %d... (press Ctrl-C to cancel)\n", port);
 
-  // Poll for client connection with a timeout so SIGINT can interrupt
+  // Poll for client connection with a timeout so SIGINT can interrupt.
+  // Save the existing handler so we restore it exactly: the engine installs
+  // I_IntHandler for graceful shutdown before we get here, and restoring
+  // SIG_DFL would kill the process immediately on any later Ctrl-C.
   net_interrupted = 0;
-  signal(SIGINT, net_sigint_handler);
+  prev_sigint = signal(SIGINT, net_sigint_handler);
 
   client_sock = -1;
   while (client_sock < 0) {
@@ -112,7 +135,7 @@ int net_session_host_start(int port)
 
     if (net_interrupted) {
       lprintf(LO_INFO, "Interrupted, aborting host.\n");
-      signal(SIGINT, SIG_DFL);
+      signal(SIGINT, prev_sigint);
       net_close(server_socket);
       server_socket = -1;
       I_SafeExit(0);
@@ -127,7 +150,7 @@ int net_session_host_start(int port)
       client_sock = net_accept(server_socket);
   }
 
-  signal(SIGINT, SIG_DFL);
+  signal(SIGINT, prev_sigint);
 
   // Close the server socket — we only need the one client
   net_close(server_socket);
@@ -150,8 +173,15 @@ int net_session_host_start(int port)
 
   lprintf(LO_INFO, "Sent game settings, waiting for client ready...\n");
 
-  // Wait for READY from client
-  msg_type = net_recv_packet(client_sock, buf, &len, sizeof(buf));
+  // Wait for READY from client — bounded to avoid an indefinite hang if the
+  // client connects but never sends its acknowledgement.
+  msg_type = net_recv_packet_timeout(client_sock, buf, &len, sizeof(buf),
+                                     NET_HANDSHAKE_TIMEOUT_MS);
+  if (msg_type == NET_RECV_TIMEOUT) {
+    lprintf(LO_ERROR, "net_session_host_start: timed out waiting for client READY\n");
+    net_session_disconnect();
+    return -1;
+  }
   if (msg_type != NET_MSG_READY) {
     lprintf(LO_ERROR, "net_session_host_start: expected READY, got %d\n", msg_type);
     net_session_disconnect();
@@ -159,6 +189,7 @@ int net_session_host_start(int port)
   }
 
   net_session.state = NET_STATE_PLAYING;
+  net_session_register_disconnect_atexit();
   lprintf(LO_INFO, "Client connected. Starting game.\n");
   return 0;
 }
@@ -171,6 +202,7 @@ int net_session_client_start(const char *address, int port)
   int sock;
   int msg_type;
   int attempts;
+  void (*prev_sigint)(int);
 
   net_transport_init();
   net_session_reset();
@@ -179,14 +211,14 @@ int net_session_client_start(const char *address, int port)
 
   // Retry until the host is available, or user interrupts with Ctrl-C.
   net_interrupted = 0;
-  signal(SIGINT, net_sigint_handler);
+  prev_sigint = signal(SIGINT, net_sigint_handler);
   attempts = 0;
   sock = -1;
 
   while (sock < 0) {
     if (net_interrupted) {
       lprintf(LO_INFO, "Interrupted, aborting join.\n");
-      signal(SIGINT, SIG_DFL);
+      signal(SIGINT, prev_sigint);
       I_SafeExit(0);
     }
 
@@ -202,7 +234,7 @@ int net_session_client_start(const char *address, int port)
     I_uSleep(1000000);
   }
 
-  signal(SIGINT, SIG_DFL);
+  signal(SIGINT, prev_sigint);
 
   net_session.socket = sock;
   net_session.is_host = 0;
@@ -210,8 +242,15 @@ int net_session_client_start(const char *address, int port)
   net_session.remote_player = 0;
   net_session.state = NET_STATE_CONNECTING;
 
-  // Receive game settings from host
-  msg_type = net_recv_packet(sock, buf, &len, sizeof(buf));
+  // Receive game settings from host — bounded to avoid an indefinite hang if
+  // the host accepts but never sends the SETUP packet.
+  msg_type = net_recv_packet_timeout(sock, buf, &len, sizeof(buf),
+                                     NET_HANDSHAKE_TIMEOUT_MS);
+  if (msg_type == NET_RECV_TIMEOUT) {
+    lprintf(LO_ERROR, "net_session_client_start: timed out waiting for host SETUP\n");
+    net_session_disconnect();
+    return -1;
+  }
   if (msg_type != NET_MSG_SETUP) {
     lprintf(LO_ERROR, "net_session_client_start: expected SETUP, got %d\n", msg_type);
     net_session_disconnect();
@@ -232,6 +271,7 @@ int net_session_client_start(const char *address, int port)
   }
 
   net_session.state = NET_STATE_PLAYING;
+  net_session_register_disconnect_atexit();
   lprintf(LO_INFO, "Connected to host. Starting game.\n");
   return 0;
 }
@@ -262,6 +302,8 @@ void net_session_disconnect(void)
   // consoleplayer and playeringame[local] remain intact so play can continue
   netgame = false;
 
+  // Purge per-session game-loop state so a reconnect or rewind starts clean.
+  NetResetState();
   net_session_reset();
   lprintf(LO_INFO, "Disconnected from multiplayer session.\n");
 }

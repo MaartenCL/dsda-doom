@@ -51,4 +51,8 @@ void D_InitNetGame(void);
 // Multiplayer-aware singletics handler (called from D_DoomLoop)
 void NetSingleTic(void);
 
+// Purge all per-session multiplayer state (checksums, loop counters).
+// Called on disconnect and at game init so reconnects start with a clean slate.
+void NetResetState(void);
+
 #endif
